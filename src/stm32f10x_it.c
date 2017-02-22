@@ -24,17 +24,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f10x_it.h"
 
-volatile int time_ms;
-volatile int time_us;
-extern __IO int flag_1s;
 //extern __IO int _USART1_cnt;
 //extern __IO unsigned char _received_string[MAX_STRLEN+1];
-//extern __IO unsigned char SPI_received_string[MAX_STRLEN+1];
-//extern __IO int SPI1_cnt;
-//extern __IO unsigned int SPI1_flag_rx;
-//extern __IO unsigned int SPI1_flag_err;
-//extern __IO unsigned char SPI1_rxd;
-//extern __IO unsigned char SPI1_txd;
+
 //#define master
 //volatile int time_us;
 //volatile int time_ms;
@@ -76,25 +68,6 @@ void DebugMon_Handler(void)
 }
 void PendSV_Handler(void)
 {
-}
-int count_1s = 1000000;
-void SysTick_Handler(void)
-{
-	if(time_ms)
-		time_ms--;
-
-	if(time_us)
-		time_us--;
-
-	if(count_1s)
-	{
-		count_1s--;
-	}
-	else
-	{
-		flag_1s = 1;
-		count_1s = 1000000;
-	}
 }
 
 
@@ -250,61 +223,6 @@ void RCC_Init()
 {
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
 }
-void ADC1_Init()
-{
-	// Enable the ADC1 clock
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
-
-	ADC_InitTypeDef ADC_InitStructure;
-	//ADC1 configuration
-	//select independent conversion mode (single)
-	ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;
-	//We will convert single channel only
-	ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-	//we will convert one time
-	ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-	//select no external triggering
-	ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;
-	//right 12-bit data alignment in ADC data register
-	ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-	//single channel conversion
-	ADC_InitStructure.ADC_NbrOfChannel = 1;
-	//load structure values to control and status registers
-	ADC_Init(ADC1, &ADC_InitStructure);
-	//wake up temperature sensor
-	ADC_TempSensorVrefintCmd(ENABLE);
-	//ADC1 channel16 configuration
-	//we select 41.5 cycles conversion for channel16
-	//and rank=1 which doesn't matter in single mode
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_16, 1, ADC_SampleTime_41Cycles5);
-	//Enable ADC1
-	ADC_Cmd(ADC1, ENABLE);
-	//Enable ADC1 reset calibration register
-	ADC_ResetCalibration(ADC1);
-	//Check the end of ADC1 reset calibration register
-	while(ADC_GetResetCalibrationStatus(ADC1));
-	//Start ADC1 calibration
-	ADC_StartCalibration(ADC1);
-	//Check the end of ADC1 calibration
-	while(ADC_GetCalibrationStatus(ADC1));
-}
-int ADC_Read(uint8_t channel)
-{
-	uint16_t AD_value;
-
-	ADC_RegularChannelConfig(ADC1, channel, 1, ADC_SampleTime_41Cycles5);
-
-	//Start ADC1 Software Conversion
-	ADC_SoftwareStartConvCmd(ADC1, ENABLE);
-	//wait for conversion complete
-	while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)){}
-	//read ADC value
-	AD_value=ADC_GetConversionValue(ADC1);
-	//clear EOC flag
-	ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
-
-	return AD_value;
-}
 void LED_green(uint8_t status)
 {
 	if(status)
@@ -325,11 +243,41 @@ void LED_green_toogle()
 void init(void)
 {
 	SystemInit(); 		// Setup STM32 system (clock, PLL and Flash configuration)
-	ADC1_Init();
+//	ADC1_Init();
 	IO_Init();
 	SysTick_Init();
 }
+void init_WDT(void)
+{
+//	cli();
+//	wdt_reset();
+//	/* Clear WDRF in MCUSR */
+//	MCUSR &= ~(1<<WDRF);
+//	/* Write logical one to WDCE and WDE */
+//	/* Keep old prescaler setting to prevent unintentional time-out */
+//	WDTCSR |= (1<<WDCE) | (1<<WDE);
+//	/* Turn off WDT */
+//	WDTCSR = 0x00;
+//	sei();
 
+	// Configuring to enable only Reset System if occurs 4 s timeout
+//	WDTCSR <== WDIF WDIE WDP3 WDCE WDE WDP2 WDP1 WDP0
+//	WDTCSR |=  (1<<WDCE) | (1<<WDE);	// Enable Watchdog Timer
+//	WDTCSR &= ~(1<<WDIE);				// Disable interrupt
+//
+//	WDTCSR |=  (1<<WDP3);				// 512k (524288) Cycles, 4.0s
+//	WDTCSR &= ~(1<<WDP2);
+//	WDTCSR &= ~(1<<WDP1);
+//	WDTCSR &= ~(1<<WDP0);
+
+//	WDTCSR |=  (1<<WDCE);
+//	WDTCSR = 0b00111000;
+
+//	wdt_enable(WDTO_8S);
+	// WDT enable
+
+//	wdt_enable(WDTO_4S);
+}
 //void USART1_IRQHandler(void)
 //{
 //	// check if the USART1 receive interrupt flag was set

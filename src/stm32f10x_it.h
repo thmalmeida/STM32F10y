@@ -51,8 +51,10 @@ void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
 //void USART1_IRQHandler(void);
-void SPI1_IRQHandler(void);
+//void SPI1_IRQHandler(void);
 
+extern volatile int time_ms;
+extern volatile int time_us;
 void _delay_us(int micro);
 void _delay_ms(int milli);
 void SysTick_Init(void);
@@ -64,6 +66,7 @@ int ADC_Read(uint8_t channel);
 void LED_green(uint8_t status);
 void LED_green_toogle();
 void init(void);
+void init_WDT(void);
 
 #ifdef __cplusplus
 }

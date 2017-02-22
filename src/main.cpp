@@ -2,42 +2,215 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "Hardware/usart.h"
+#include "Hardware/spi.h"
 
-#define master
-#define debug
+#include "Modules/nRF24L01p.h"
 
+#include "Hardware/eeprom.h"
+#include "acionna.h"
 #include <time.h>
 #include <stm32f10x.h>
 #include <stm32f10x_rtc.h>
 #include "stm32f10x_it.h"
-#include "eeprom.h"
 
-#include "nRF24L01p.h"
+#define master
+#define debug
 
-#include "usart.h"
-
-USART Serial;
-
+SPI SerialSPI;
+ACIONNA acn;
 
 TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 TIM_OCInitTypeDef  TIM_OCInitStructure;
 
 __IO int flag_1s;
 
-// Bluetooth str parse variables
-uint8_t enableDecode = 0, opcode;
-uint8_t k, rLength, j;
-uint8_t j2 = 0;
-uint8_t flag_frameStartBT = 0;
-uint8_t enableTranslate_Bluetooth = 0;
-char aux[3], aux2[4], buffer[60], inChar, sInstr[20];
-char sInstrBluetooth[30];
+// Addresses
+const uint8_t addr_stateMode 			= 1;	// 1 bytes
+const uint8_t addr_LevelRef 			= 2;	// 4 bytes
+const uint8_t addr_standBy_min 			= 5;	// 2 bytes
+const uint8_t addr_PRessureRef 			= 7;	// 1 byte
+const uint8_t addr_PRessureRef_Valve	= 8;	// 1 byte
+const uint8_t addr_PRessureMax_Sensor	= 9;	// 1 byte
+const uint8_t addr_motorTimerE 			= 10;	// 2 byte
+const uint8_t addr_HourOnTM 			= 30;	// 9 bytes
+const uint8_t addr_MinOnTM 				= 39;	// nTM byte(s)
+const uint8_t addr_nTM 					= 48;	// 1 byte
+const uint8_t addr_motorTimerStart1 	= 65;	// 2 bytes
+const uint8_t addr_motorTimerStart2 	= 67;	// 2 bytes
+const uint8_t addr_PREssurePer 			= 69;	// 1 byte
 
-unsigned char rxc;
-unsigned char txcm = 0x4d;	// M
-unsigned char txcs = 0x40;	// @
+// Wake up interrupts
+uint8_t flag_WDRF = 0;			// Watchdog System Reset Flag
+uint8_t flag_BORF = 0;			// Brown-out Reset Flag
+uint8_t flag_EXTRF = 0;			// External Reset Flag
+uint8_t flag_PORF = 0;			// Power-on Reset Flag
+
+//uint8_t flag_waitPowerOn = 1;	// Minutes before start motor after power line ocasionally down
+//uint8_t waitPowerOn_min_standBy=0;
+//uint8_t waitPowerOn_min = 0;
+//uint8_t waitPowerOn_sec = 0;
+////uint8_t powerOff_min = 0;
+////uint8_t powerOff_sec = 0;
+//// Motor timers in milliseconds
+//uint8_t motorTimerStart1 = 35;
+//uint16_t motorTimerStart2 = 200;
+
+int main(void)
+{
+	init();
+
+	acn.begin_acn();
+	Serial.begin(9600);	// initialize USART1 @ 9600 baud
+
+	while(1)
+	{
+		acn.comm_Bluetooth();
+
+		acn.handleMessage();
+	}
+}
+
+
+/*
+ * Interruptions sequence
+ */
+extern "C" {
+volatile int time_ms;
+volatile int time_us;
+volatile int count_1s = 1000000;
+void SysTick_Handler(void)
+{
+	if(time_us)
+		time_us--;
+
+	if(time_ms)
+		time_ms--;
+
+	if(count_1s)
+	{
+		count_1s--;
+	}
+	else
+	{
+		acn.flag_1s = 1;
+		count_1s = 1000000;
+	}
+}
+void USART1_IRQHandler(void)
+{
+	// check if the USART1 receive interrupt flag was set
+	while(USART_GetITStatus(USART1, USART_IT_RXNE))
+	{
+//		GPIOC -> ODR ^= (1<<13);
+		char t = (USART1->DR); // the character from the USART1 data register is saved in t
+
+		if(Serial._USART1_cnt < MAX_STRLEN)
+		{
+			Serial._received_string[Serial._USART1_cnt] = t;
+			Serial._USART1_cnt++;
+		}
+		else
+		{
+			memset(Serial._received_string,0,sizeof(Serial._received_string));
+			Serial._USART1_cnt = 0;
+		}
+	}
+}
+void SPI1_IRQHandler(void)
+{
+#ifdef master
+	//	static unsigned short int count = 0, i = 0 ;
+	//	check if the SPI1 receive interrupt flag was set
+	//	Master interrupt
+	//	TX: 1- empty
+	//	if(SPI1 -> SR & 0x0002)
+		if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_TXE) == SET)
+		{
+			SerialSPI.SPI1_flag_rx = 1;
+			SerialSPI.SPI1_rxd++;
+			SerialSPI.SPI1_txd = SerialSPI.SPI1_rxd;
+			SPI1 -> DR = SerialSPI.SPI1_txd;
+	//		Wait until the data has been transmitted.
+	//		while (!(SPI1->SR & SPI_I2S_FLAG_TXE));
+	//		USART1_print("Transmitting: ");
+	//		USART1_putc(0x40);
+		}
+//	//	if(SPI1 -> SR & SPI_I2S_FLAG_RXNE)
+//		//	RX: 1- not empty
+//	//	if(SPI1 -> SR & 0x0001)
+		if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_RXNE) == SET)
+		{
+			SerialSPI.SPI1_flag_rx = 1;
+			SerialSPI.SPI1_rxd = SPI1 -> DR;
+			if(SerialSPI.SPI1_cnt < MAX_STRLEN)
+			{
+				SerialSPI.SPI_received_string[SerialSPI.SPI1_cnt] = SerialSPI.SPI1_rxd;
+				SerialSPI.SPI1_cnt++;
+			}
+			else
+			{
+				memset(SerialSPI.SPI_received_string, 0, sizeof(SerialSPI.SPI_received_string));
+				SerialSPI.SPI1_cnt = 0;
+			}
+		}
+
+	//	if(SPI1 -> SR & 0x0100)
+		if(SPI_I2S_GetITStatus(SPI1, SPI_IT_CRCERR))
+		{
+			SerialSPI.SPI1_flag_err = 1;
+		}
+#else
+//	static unsigned short int count = 0, i = 0 ;
+//	check if the SPI1 receive interrupt flag was set
+//	Slave interrupt
+//	TX: 1- empty
+//	if(SPI1 -> SR & 0x0002)
+	if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_TXE) == SET)
+	{
+		SerialSPI.SPI1_rxd++;
+		SerialSPI.SPI1_txd = SerialSPI.SPI1_rxd;
+		SPI1 -> DR = SerialSPI.SPI1_txd;
+//		Wait until the data has been transmitted.
+//		while (!(SPI1->SR & SPI_I2S_FLAG_TXE));
+//		USART1_print("Transmitting: ");
+//		USART1_putc(0x40);
+	}
+//	if(SPI1 -> SR & SPI_I2S_FLAG_RXNE)
+	//	RX: 1- not empty
+//	if(SPI1 -> SR & 0x0001)
+	if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_RXNE) == SET)
+	{
+		SerialSPI.SPI1_flag_rx = 1;
+		SerialSPI.SPI1_rxd = SPI1 -> DR;
+		if(SerialSPI.SPI1_cnt < MAX_STRLEN)
+		{
+			SerialSPI.SPI_received_string[SerialSPI.SPI1_cnt] = SerialSPI.SPI1_rxd;
+			SerialSPI.SPI1_cnt++;
+		}
+		else
+		{
+			memset(SerialSPI.SPI_received_string, 0, sizeof(SerialSPI.SPI_received_string));
+			SerialSPI.SPI1_cnt = 0;
+		}
+	}
+
+//	if(SPI1 -> SR & 0x0100)
+	if(SPI_I2S_GetITStatus(SPI1, SPI_IT_CRCERR))
+	{
+		SerialSPI.SPI1_flag_err = 1;
+	}
+#endif
+}
+}
+/*
+ * Interruptions sequence END
+ */
+
+//unsigned char rxc;
+//unsigned char txcm = 0x4d;	// M
+//unsigned char txcs = 0x40;	// @
 //	unsigned char txcs = 0x53;	// S
-
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -92,115 +265,300 @@ unsigned char txcs = 0x40;	// @
 //		delay_ms(500);
 //	}
 //}
-void comm_Bluetooth()
-{
-	// Rx - Always listening
-//	uint8_t j2 =0;
-	while((Serial.available()>0))	// Reading from serial
-	{
-//		Serial.sendByte('B');
-		inChar = Serial.readByte();
-
-		if(inChar=='$')
-		{
-			j2 = 0;
-			flag_frameStartBT = 1;
-//			Serial.println("Frame Start!");
-		}
-
-		if(flag_frameStartBT)
-			sInstrBluetooth[j2] = inChar;
-
-//		sprintf(buffer,"J= %d",j2);
-//		Serial.println(buffer);
-
-		j2++;
-
-		if(j2>=sizeof(sInstrBluetooth))
-		{
-			memset(sInstrBluetooth,0,sizeof(sInstrBluetooth));
-			j2=0;
-//			Serial.println("ZEROU! sIntr BLuetooth Buffer!");
-		}
-
-		if(inChar==';')
-		{
-//			Serial.println("Encontrou ; !");
-			if(flag_frameStartBT)
-			{
-//				Serial.println("Frame Stop!");
-				flag_frameStartBT = 0;
-				rLength = j2;
-				j2 = 0;
-				enableTranslate_Bluetooth = 1;
-			}
-		}
-	}
-//	flag_frameStart = 0;
-
-	if(enableTranslate_Bluetooth)
-	{
-//		Serial.println("enableTranslate_Bluetooth");
-		enableTranslate_Bluetooth = 0;
-
-		char *pi0, *pf0;
-		pi0 = strchr(sInstrBluetooth,'$');
-		pf0 = strchr(sInstrBluetooth,';');
-
-		if(pi0!=NULL)
-		{
-			uint8_t l0=0;
-			l0 = pf0 - pi0;
-
-			int i;
-			for(i=1;i<=l0;i++)
-			{
-				sInstr[i-1] = pi0[i];
-//				Serial.sendByte(sInstr[i-1]);
-//				Serial.write(sInstr[i-1]);
-			}
-			memset(sInstrBluetooth,0,sizeof(sInstrBluetooth));
-	//		Serial.println(sInstr);
-//			USART1_println(sInstr);
-
-			enableDecode = 1;
-		}
-		else
-		{
-//			Serial.println("Err");
-//			USART1_putc(pi0[0]);
-//			USART1_putc(pf0[0]);
-		}
-	}
-}
-void handleMessage()
-{
-	if(enableDecode)
-	{
-		enableDecode = 0;
-
-		// Getting the opcode
-		aux[0] = sInstr[0];
-		aux[1] = sInstr[1];
-		aux[2] = '\0';
-		opcode = (uint8_t) atoi(aux);
-
-//		uint8_t reg_value, reg_addr, rxc;
-
-		switch (opcode)
-		{
-			case 0:		// Set motor ON/OFF
-			{
-				if(sInstr[2] == ';')
-				{
-					LED_green_toogle();
-					Serial.println("Fuck!");
-				}
-			}
-		}
-		memset(sInstr,0,sizeof(sInstr));	// Clear all vector;
-	}
-}
+//void uart_demo1(void)
+//{
+//	char c = 'a';
+//	uint8_t flag01 =0;
+//
+//	if(!flag01)
+//	{
+//		Serial.write(c++);
+//		if(c == 'f')
+//		{
+//			flag01 = 1;
+//		}
+//	}
+//	else
+//	{
+//		Serial.write(c--);
+//		if(c == 'a')
+//		{
+//			flag01 = 0;
+//		}
+//	}
+//	_delay_ms(500);
+//}
+//void USART1_IRQHandler(void)
+//{
+//	// check if the USART1 receive interrupt flag was set
+//	while(USART_GetITStatus(USART1, USART_IT_RXNE))
+//	{
+//		LED_green_toogle();
+//		char t = USART1->DR; // the character from the USART1 data register is saved in t
+//		if(Serial._USART1_cnt < MAX_STRLEN)
+//		{
+//			Serial._received_string[Serial._USART1_cnt] = t;
+//			Serial._USART1_cnt++;
+//		}
+//		else
+//		{
+////			memset(Serial._received_string,0,sizeof(Serial._received_string));
+//			Serial._USART1_cnt = 0;
+//		}
+//	}
+//}
+//int main(void)
+//{
+//	//	SystemCoreClockUpdate();
+//	SystemInit(); 		// Setup STM32 system (clock, PLL and Flash configuration)
+//
+//	ADC1_Init();
+//	IO_Init();
+//	SysTick_Init();
+//	USART1_Init(38400); // initialize USART1 @ 38400 baud
+//
+//#ifdef master
+//	nRF24_Init();
+//	USART1_println("Hi, Master!");
+//#else
+//	nRF24_Init();
+//	USART1_println("Hi, Slave!");
+//#endif
+//
+//	while (1)
+//	{
+//#ifdef master
+//		comm_Bluetooth();
+//		handleMessage();
+//		refresh_variables();
+//
+//		if(stateMode == 2)
+//		{
+////				sprintf(buffer,"%2d", nRF24_get_RPD());
+////				USART1_println(buffer);
+////
+////				sprintf(buffer,"%2d", nRF24_read_register(NRF_STATUS));
+////				USART1_println(buffer);
+////
+////				sprintf(buffer,"%2d", nRF24_read_register(FIFO_STATUS));
+////				USART1_println(buffer);
+//
+//			if(nRF24_IRQ())
+//			{
+//				USART1_println("IRQ Pin");
+//
+//				int pipeRX = nRF24_poll_RX();
+//				if(pipeRX)
+//				{
+//		//			uint8_t payload_length = nRF24_get_pipe_payload_len(0);
+//					uint8_t data[2];
+//					nRF24_read_payload(data, 2);
+////					nRF24_flush_RX();								// flush rx;
+//					sprintf(buffer,"rx: %c, %c", data[0], data[1]);
+//					USART1_println(buffer);
+//				}
+//			}
+//		}
+//
+//		if(flag_1s)
+//		{
+//			flag_1s ^= flag_1s;
+//
+//			if(nRF24_flag_send_cont)
+//			{
+//				nRF24_send_2bytes();
+//			}
+//		}
+//
+//#else
+////		nRF24_set_RX_mode(ENABLE);
+//
+//
+//		// Transmitter;
+////		nRF24_set_TX_mode(ENABLE);
+//
+//
+//
+////		SPI1_slave_demo01();
+//#endif
+//	}
+//
+//	return 0;
+//
+//
+////	__DATE__
+//
+//	FLASH_Unlock();		// Unlock the Flash Program Erase controller
+//	EE_Init();			// EEPROM Init
+//
+//
+//
+////	time_t     utcsec;
+//	long utcsec;
+////	struct tm  ts;
+//	char       buf[80];
+////	Get current time
+////	time(&now);
+//	utcsec = 1467296589;
+////	Format time, "ddd yyyy-mm-dd hh:mm:ss zzz"
+////	ts = *localtime(&now);
+//	char *c_time_string;
+//    c_time_string = ctime(&utcsec);
+//    sprintf(buf, "Current time is %s", c_time_string);
+////	sprintf(buf, "utcsec: %d", utcsec);
+////    strcpy(buf, "Current time is ");
+//	USART1_println(buf);
+//	int i;
+//	for(i=0;i<20;i++)
+//	{
+//		EE_WriteVariable(addr, name[i]);
+//	}
+//	/* --- Store successively many values of the three variables in the EEPROM ---*/
+//	/* Store 1000 values of Variable1 in EEPROM */
+//	for (VarValue = 0; VarValue < 1000; VarValue++)
+//	{
+//		EE_WriteVariable(VirtAddVarTab[0], VarValue);
+//	}
+//
+//	/* Store 500 values of Variable2 in EEPROM */
+//	for (VarValue = 0; VarValue < 500; VarValue++)
+//	{
+//		EE_WriteVariable(VirtAddVarTab[1], VarValue);
+//	}
+//
+//	/* Store 800 values of Variable3 in EEPROM */
+//	for (VarValue = 0; VarValue < 800; VarValue++)
+//	{
+//		EE_WriteVariable(VirtAddVarTab[2], VarValue);
+//	}
+// DEBOUNCE!!!!
+//int button_is_pressed()
+//{
+//	/* the button is pressed when BUTTON_BIT is clear */
+//	if (bit_is_clear(BUTTON_R_PIN, BUTTON_R_BIT))
+//	{
+//		_delay_ms(DEBOUNCE_TIME);
+//		if (bit_is_clear(BUTTON_R_PIN, BUTTON_R_BIT))
+//			return 1;
+//	}
+//	if (bit_is_clear(BUTTON_L_PIN, BUTTON_L_BIT))
+//	{
+//		_delay_ms(DEBOUNCE_TIME);
+//		if (bit_is_clear(BUTTON_L_PIN, BUTTON_L_BIT))
+//			return -1;
+//	}
+//	return 0;
+//}
+#pragma GCC diagnostic pop
+//void comm_Bluetooth()
+//{
+//	// Rx - Always listening
+////	uint8_t j2 =0;
+//	while((Serial.available()>0))	// Reading from serial
+//	{
+////		Serial.sendByte('B');
+//		inChar = Serial.readByte();
+//
+//		if(inChar=='$')
+//		{
+//			j2 = 0;
+//			flag_frameStartBT = 1;
+////			Serial.println("Frame Start!");
+//		}
+//
+//		if(flag_frameStartBT)
+//			sInstrBluetooth[j2] = inChar;
+//
+////		sprintf(buffer,"J= %d",j2);
+////		Serial.println(buffer);
+//
+//		j2++;
+//
+//		if(j2>=sizeof(sInstrBluetooth))
+//		{
+//			memset(sInstrBluetooth,0,sizeof(sInstrBluetooth));
+//			j2=0;
+////			Serial.println("ZEROU! sIntr BLuetooth Buffer!");
+//		}
+//
+//		if(inChar==';')
+//		{
+////			Serial.println("Encontrou ; !");
+//			if(flag_frameStartBT)
+//			{
+////				Serial.println("Frame Stop!");
+//				flag_frameStartBT = 0;
+//				rLength = j2;
+//				j2 = 0;
+//				enableTranslate_Bluetooth = 1;
+//			}
+//		}
+//	}
+////	flag_frameStart = 0;
+//
+//	if(enableTranslate_Bluetooth)
+//	{
+////		Serial.println("enableTranslate_Bluetooth");
+//		enableTranslate_Bluetooth = 0;
+//
+//		char *pi0, *pf0;
+//		pi0 = strchr(sInstrBluetooth,'$');
+//		pf0 = strchr(sInstrBluetooth,';');
+//
+//		if(pi0!=NULL)
+//		{
+//			uint8_t l0=0;
+//			l0 = pf0 - pi0;
+//
+//			int i;
+//			for(i=1;i<=l0;i++)
+//			{
+//				sInstr[i-1] = pi0[i];
+////				Serial.sendByte(sInstr[i-1]);
+////				Serial.write(sInstr[i-1]);
+//			}
+//			memset(sInstrBluetooth,0,sizeof(sInstrBluetooth));
+//	//		Serial.println(sInstr);
+////			USART1_println(sInstr);
+//
+//			enableDecode = 1;
+//		}
+//		else
+//		{
+////			Serial.println("Err");
+////			USART1_putc(pi0[0]);
+////			USART1_putc(pf0[0]);
+//		}
+//	}
+//}
+//void handleMessage()
+//{
+//	if(enableDecode)
+//	{
+//		enableDecode = 0;
+//
+//		// Getting the opcode
+//		aux[0] = sInstr[0];
+//		aux[1] = sInstr[1];
+//		aux[2] = '\0';
+//		opcode = (uint8_t) atoi(aux);
+//
+////		uint8_t reg_value, reg_addr, rxc;
+//
+//		switch (opcode)
+//		{
+//			case 0:		// Set motor ON/OFF
+//			{
+//				if(sInstr[2] == ';')
+//				{
+//					LED_green_toogle();
+//					Serial.println("Fuck!");
+//				}
+//			}
+//		}
+//		memset(sInstr,0,sizeof(sInstr));	// Clear all vector;
+//	}
+//}
 //void handleMessage()
 //{
 //	if(enableDecode)
@@ -503,238 +861,5 @@ void handleMessage()
 //	}
 //}
 //int main(int argc, char* argv[])
-
-int main(void)
-{
-	init();
-
-	Serial.begin(9600);	// initialize USART1 @ 9600 baud
-
-	while(1)
-	{
-		comm_Bluetooth();
-
-		handleMessage();
-	}
-
-}
-
-
-/*
- * Interruptions sequence
- */
-extern "C" {
-void USART1_IRQHandler(void)
-{
-	// check if the USART1 receive interrupt flag was set
-	while(USART_GetITStatus(USART1, USART_IT_RXNE))
-	{
-//		GPIOC -> ODR ^= (1<<13);
-		char t = (USART1->DR); // the character from the USART1 data register is saved in t
-
-		if(Serial._USART1_cnt < MAX_STRLEN)
-		{
-			Serial._received_string[Serial._USART1_cnt] = t;
-			Serial._USART1_cnt++;
-		}
-		else
-		{
-			memset(Serial._received_string,0,sizeof(Serial._received_string));
-			Serial._USART1_cnt = 0;
-		}
-	}
-}
-}
-/*
- * Interruptions sequence END
- */
-
-void uart_demo1(void)
-{
-	char c = 'a';
-	uint8_t flag01 =0;
-
-	if(!flag01)
-	{
-		Serial.sendByte(c++);
-		if(c == 'f')
-		{
-			flag01 = 1;
-		}
-	}
-	else
-	{
-		Serial.sendByte(c--);
-		if(c == 'a')
-		{
-			flag01 = 0;
-		}
-	}
-	_delay_ms(500);
-}
-
-
-//void USART1_IRQHandler(void)
-//{
-//	// check if the USART1 receive interrupt flag was set
-//	while(USART_GetITStatus(USART1, USART_IT_RXNE))
-//	{
-//		LED_green_toogle();
-//		char t = USART1->DR; // the character from the USART1 data register is saved in t
-//		if(Serial._USART1_cnt < MAX_STRLEN)
-//		{
-//			Serial._received_string[Serial._USART1_cnt] = t;
-//			Serial._USART1_cnt++;
-//		}
-//		else
-//		{
-////			memset(Serial._received_string,0,sizeof(Serial._received_string));
-//			Serial._USART1_cnt = 0;
-//		}
-//	}
-//}
-//int main(void)
-//{
-//	//	SystemCoreClockUpdate();
-//	SystemInit(); 		// Setup STM32 system (clock, PLL and Flash configuration)
-//
-//	ADC1_Init();
-//	IO_Init();
-//	SysTick_Init();
-//	USART1_Init(38400); // initialize USART1 @ 38400 baud
-//
-//#ifdef master
-//	nRF24_Init();
-//	USART1_println("Hi, Master!");
-//#else
-//	nRF24_Init();
-//	USART1_println("Hi, Slave!");
-//#endif
-//
-//	while (1)
-//	{
-//#ifdef master
-//		comm_Bluetooth();
-//		handleMessage();
-//		refresh_variables();
-//
-//		if(stateMode == 2)
-//		{
-////				sprintf(buffer,"%2d", nRF24_get_RPD());
-////				USART1_println(buffer);
-////
-////				sprintf(buffer,"%2d", nRF24_read_register(NRF_STATUS));
-////				USART1_println(buffer);
-////
-////				sprintf(buffer,"%2d", nRF24_read_register(FIFO_STATUS));
-////				USART1_println(buffer);
-//
-//			if(nRF24_IRQ())
-//			{
-//				USART1_println("IRQ Pin");
-//
-//				int pipeRX = nRF24_poll_RX();
-//				if(pipeRX)
-//				{
-//		//			uint8_t payload_length = nRF24_get_pipe_payload_len(0);
-//					uint8_t data[2];
-//					nRF24_read_payload(data, 2);
-////					nRF24_flush_RX();								// flush rx;
-//					sprintf(buffer,"rx: %c, %c", data[0], data[1]);
-//					USART1_println(buffer);
-//				}
-//			}
-//		}
-//
-//		if(flag_1s)
-//		{
-//			flag_1s ^= flag_1s;
-//
-//			if(nRF24_flag_send_cont)
-//			{
-//				nRF24_send_2bytes();
-//			}
-//		}
-//
-//#else
-////		nRF24_set_RX_mode(ENABLE);
-//
-//
-//		// Transmitter;
-////		nRF24_set_TX_mode(ENABLE);
-//
-//
-//
-////		SPI1_slave_demo01();
-//#endif
-//	}
-//
-//	return 0;
-//
-//
-////	__DATE__
-//
-//	FLASH_Unlock();		// Unlock the Flash Program Erase controller
-//	EE_Init();			// EEPROM Init
-//
-//
-//
-////	time_t     utcsec;
-//	long utcsec;
-////	struct tm  ts;
-//	char       buf[80];
-////	Get current time
-////	time(&now);
-//	utcsec = 1467296589;
-////	Format time, "ddd yyyy-mm-dd hh:mm:ss zzz"
-////	ts = *localtime(&now);
-//	char *c_time_string;
-//    c_time_string = ctime(&utcsec);
-//    sprintf(buf, "Current time is %s", c_time_string);
-////	sprintf(buf, "utcsec: %d", utcsec);
-////    strcpy(buf, "Current time is ");
-//	USART1_println(buf);
-//	int i;
-//	for(i=0;i<20;i++)
-//	{
-//		EE_WriteVariable(addr, name[i]);
-//	}
-//	/* --- Store successively many values of the three variables in the EEPROM ---*/
-//	/* Store 1000 values of Variable1 in EEPROM */
-//	for (VarValue = 0; VarValue < 1000; VarValue++)
-//	{
-//		EE_WriteVariable(VirtAddVarTab[0], VarValue);
-//	}
-//
-//	/* Store 500 values of Variable2 in EEPROM */
-//	for (VarValue = 0; VarValue < 500; VarValue++)
-//	{
-//		EE_WriteVariable(VirtAddVarTab[1], VarValue);
-//	}
-//
-//	/* Store 800 values of Variable3 in EEPROM */
-//	for (VarValue = 0; VarValue < 800; VarValue++)
-//	{
-//		EE_WriteVariable(VirtAddVarTab[2], VarValue);
-//	}
-// DEBOUNCE!!!!
-//int button_is_pressed()
-//{
-//	/* the button is pressed when BUTTON_BIT is clear */
-//	if (bit_is_clear(BUTTON_R_PIN, BUTTON_R_BIT))
-//	{
-//		_delay_ms(DEBOUNCE_TIME);
-//		if (bit_is_clear(BUTTON_R_PIN, BUTTON_R_BIT))
-//			return 1;
-//	}
-//	if (bit_is_clear(BUTTON_L_PIN, BUTTON_L_BIT))
-//	{
-//		_delay_ms(DEBOUNCE_TIME);
-//		if (bit_is_clear(BUTTON_L_PIN, BUTTON_L_BIT))
-//			return -1;
-//	}
-//	return 0;
-//}
-#pragma GCC diagnostic pop
 
 // ----------------------------------------------------------------------------
