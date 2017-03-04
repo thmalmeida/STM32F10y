@@ -15,6 +15,7 @@
 class USART {
 public:
 
+	char buffer[30];
 	volatile int _USART1_cnt;
 	unsigned char _received_string[50];
 //	extern __IO int USART1_cnt;
@@ -25,9 +26,10 @@ public:
 
 	void print(char const *s);
 	void println(char const *s);
-	void sendByte(char c);
+	void println(int value);
+	void write(char c);
 	int available();
-	char readByte();
+	char read();
 
 private:
 	static void USART1_IRQHandler(void);

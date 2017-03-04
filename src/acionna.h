@@ -42,165 +42,13 @@
 
 #include <stm32f10x.h>
 
+#include "Hardware/rtc.h"
 #include "Hardware/adc.h"
 #include "Hardware/usart.h"
+#include "Hardware/spi.h"
+#include "Hardware/gpio.h"
+#include "Hardware/EE.h"
 #include <ctime>
-
-class GPIO {
-public:
-
-	void gateConfig(uint8_t pin, uint8_t dir);
-	void gateSet(uint8_t pin, uint8_t status);
-	void gateToggle(uint8_t pin);
-	bool gateRead(uint8_t pin);
-};
-
-void GPIO::gateConfig(uint8_t pin, uint8_t dir)
-{
-	GPIO_InitTypeDef GPIO_InitStructure;
-	switch (pin)
-	{
-		case 1:
-			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
-
-			if(dir)
-			{
-				GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD;
-				GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-			}
-			else
-			{
-				GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-			}
-			GPIO_Init(GPIOC, &GPIO_InitStructure);
-			break;
-
-		case 2:
-			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
-
-			if(dir)
-			{
-				GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD;
-				GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-			}
-			else
-			{
-				GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-			}
-			GPIO_Init(GPIOC, &GPIO_InitStructure);
-			break;
-
-		case 3:
-			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
-
-			if(dir)
-			{
-				GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD;
-				GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-			}
-			else
-			{
-				GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-			}
-			GPIO_Init(GPIOC, &GPIO_InitStructure);
-			break;
-	}
-}
-void GPIO::gateSet(uint8_t pin, uint8_t status)
-{
-	switch (pin)
-	{
-		case 1:
-			if(status)
-			{
-				GPIOC -> BSRR = (1<<(13+16)); // 16 bit shift
-		//		GPIO_SetBits(GPIOC, 13);
-			}
-			else
-			{
-				GPIOC -> BSRR = (1<<13);
-		//		GPIO_ResetBits(GPIOC, 13);
-			}
-			break;
-
-		case 2:
-			if(status)
-			{
-				GPIOC -> BSRR = (1<<(14+16)); // 16 bit shift
-		//		GPIO_SetBits(GPIOC, 14);
-			}
-			else
-			{
-				GPIOC -> BSRR = (1<<14);
-		//		GPIO_ResetBits(GPIOC, 13);
-			}
-			break;
-
-		case 3:
-			if(status)
-			{
-				GPIOC -> BSRR = (1<<(15+16)); // 16 bit shift
-		//		GPIO_SetBits(GPIOC, 15);
-			}
-			else
-			{
-				GPIOC -> BSRR = (1<<15);
-		//		GPIO_ResetBits(GPIOC, 15);
-			}
-			break;
-	}
-}
-void GPIO::gateToggle(uint8_t pin)
-{
-	switch (pin)
-	{
-		case 1:
-			GPIOC -> ODR ^= (1<<13);
-			break;
-
-		case 2:
-			GPIOC -> ODR ^= (1<<14);
-			break;
-
-		case 3:
-			GPIOC -> ODR ^= (1<<15);
-			break;
-	}
-
-}
-bool GPIO::gateRead(uint8_t pin)
-{
-	uint8_t status = 0;
-
-	switch (pin)
-	{
-		case 1:
-			status = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13);
-			break;
-
-		case 2:
-			status = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_14);
-			break;
-
-		case 3:
-			status = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_15);
-			break;
-
-		case 4:
-			status = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
-			break;
-	}
-
-	if(status)
-	{
-		return true;
-	}
-	else
-		return false;
-}
 
 #define pin_out_led 1
 #define pin_out_k1	2
@@ -210,9 +58,7 @@ bool GPIO::gateRead(uint8_t pin)
 #define pin_in_k1	6
 #define pin_in_k3	7
 
-#define startTypeK			1		// Partida direta: monofásico
-//#define startTypeK			2		// Partida direta: trifásico
-//#define startTypeK			3		// Partida estrela/triangulo
+#define startTypeK	1		// 1-Partida direta: monofásico; 2-Partida direta: trifásico; 3-Partida estrela/triangulo
 
 enum states01 {
 	redTime,
@@ -220,22 +66,12 @@ enum states01 {
 };
 enum states01 periodo = redTime;
 
-typedef struct  {
-	uint8_t Second;
-	uint8_t Minute;
-	uint8_t Hour;
-	uint8_t Wday;   // day of week, sunday is day 1
-	uint8_t Day;
-	uint8_t Month;
-	uint8_t Year;   // offset from 1970;
-} tmElements_t, TimeElements, *tmElementsPtr_t;
-
-tmElements_t tm;
-
 USART Serial;
-
-class ACIONNA : GPIO , ADC, USART {
+EEPROM 	eeprom;
+class ACIONNA : GPIO , ADC, USART, EEPROM {
 public:
+
+	tmElements_t tm;
 
 	uint8_t enableDecode = 0, opcode;
 	static const uint8_t sInstr_SIZE = 17;
@@ -357,6 +193,7 @@ public:
 	void process_Mode();
 	void summary_Print(uint8_t opt);
 	void RTC_update();
+	void RTC_update1();
 	void refreshVariables();
 	void refreshStoredData();
 	void handleMessage();
@@ -370,6 +207,21 @@ private:
 	void k3_on();
 	void k3_off();
 };
+
+void ACIONNA::begin_acn()
+{
+	gateConfig(pin_out_k1, 1);
+	gateConfig(pin_out_k2, 1);
+	gateConfig(pin_out_k3, 1);
+
+	gateConfig(pin_in_k1, 0);
+	gateConfig(pin_in_k3, 0);
+	gateConfig(pin_in_Rth, 0);
+
+	rtc.begin_rtc();
+//	eeprom.begin_eeprom();
+//	refreshStoredData();
+}
 bool ACIONNA::readPin_Rth()
 {
 	return gateRead(pin_in_Rth);
@@ -385,16 +237,6 @@ bool ACIONNA::readPin_k1_PIN()
 bool ACIONNA::readPin_k3()
 {
 	return gateRead(pin_in_k3);
-}
-void ACIONNA::begin_acn()
-{
-	gateConfig(pin_out_k1, 1);
-	gateConfig(pin_out_k2, 1);
-	gateConfig(pin_out_k3, 1);
-
-	gateConfig(pin_in_k1, 0);
-	gateConfig(pin_in_k3, 0);
-	gateConfig(pin_in_Rth, 0);
 }
 void ACIONNA::drive_led_on()
 {
@@ -952,10 +794,11 @@ void ACIONNA::summary_Print(uint8_t opt)
 	switch (opt)
 	{
 		case 0:
-			sprintf(buffer,"Time:%.2d:%.2d:%.2d %.2d/%.2d",tm.Hour, tm.Minute, tm.Second, tm.Day, tm.Month);//, tmYearToCalendar(tm.Year));
+			sprintf(buffer,"Time:%.2d:%.2d:%.2d %.2d/%.2d/%.4d",tm.Hour, tm.Minute, tm.Second, tm.Day, tm.Month, tm.Year+1970);
 			Serial.print(buffer);
 
 //			sprintf(buffer," UP:%.2d:%.2d:%.2d, d:%d m:%d", hour(), minute(), second(), day()-1, month()-1);
+			sprintf(buffer," UP:%.2d:%.2d:%.2d, d:%d m:%d", rtc.rtc0->tm_hour, rtc.rtc0->tm_min, rtc.rtc0->tm_sec, rtc.rtc0->tm_mday-1, rtc.rtc0->tm_mon);
 			Serial.println(buffer);
 
 			sprintf(buffer," P:%d k1:%d",periodo, motorStatus);
@@ -1131,6 +974,17 @@ void ACIONNA::summary_Print(uint8_t opt)
 			break;
 	}
 }
+void ACIONNA::RTC_update1()
+{
+	rtc.getUptime();
+	rtc.getTime();
+	tm.Year 	= rtc.timeinfo->tm_year;
+	tm.Month 	= rtc.timeinfo->tm_mon+1;
+	tm.Day 		= rtc.timeinfo->tm_mday;
+	tm.Hour 	= rtc.timeinfo->tm_hour;
+	tm.Minute 	= rtc.timeinfo->tm_min;
+	tm.Second 	= rtc.timeinfo->tm_sec;
+}
 void ACIONNA::RTC_update()
 {
 	if(tm.Second == 59)
@@ -1190,19 +1044,19 @@ void ACIONNA::refreshVariables()
 	if (flag_1s)
 	{
 		flag_1s = 0;
-		RTC_update();
+		RTC_update1();
 //		RTC.read(tm);
 
 		check_gpio();			// Check drive status pin;
 		check_period();			// Period verify;
 		check_timeMatch();		// time matches flag;
-		check_TimerVar();		// drive timers
+//		check_TimerVar();		// drive timers
 
-		check_pressure();		// get and check pressure system;
-		check_thermalSafe();	// thermal relay check;
-		check_levelSensors();	// level sensors;
+//		check_pressure();		// get and check pressure system;
+//		check_thermalSafe();	// thermal relay check;
+//		check_levelSensors();	// level sensors;
 
-		check_pressureDown();
+//		check_pressureDown();
 
 		if(flag_debug)
 		{
@@ -1212,31 +1066,32 @@ void ACIONNA::refreshVariables()
 }
 void ACIONNA::refreshStoredData()
 {
-	stateMode = //eeprom_read_byte((uint8_t *)(addr_stateMode));
-
-	waitPowerOn_min_standBy = //eeprom_read_byte((uint8_t *)(addr_standBy_min));
-	waitPowerOn_min = waitPowerOn_min_standBy;
-
-	uint8_t lbyte, hbyte;
-	hbyte = //eeprom_read_byte((uint8_t *)(addr_LevelRef+1));
-	lbyte = //eeprom_read_byte((uint8_t *)(addr_LevelRef));
-	levelRef_10bit = ((hbyte << 8) | lbyte);
-
-	hbyte = //eeprom_read_byte((uint8_t *)(addr_motorTimerE+1));
-	lbyte = //eeprom_read_byte((uint8_t *)(addr_motorTimerE));
-	motorTimerE = ((hbyte << 8) | lbyte);
-
-//	PRessureRef = //eeprom_read_byte((uint8_t *)(addr_PRessureRef));
-//	PRessureRef_Valve = //eeprom_read_byte((uint8_t *)(addr_PRessureRef_Valve));
-//	PRessurePer = //eeprom_read_byte((uint8_t *)(addr_PREssurePer));
-//	PRessureMax_Sensor = //eeprom_read_byte((uint8_t *)(addr_PRessureMax_Sensor));
+//	stateMode = eeprom.read(eeprom.addr_stateMode);	//eeprom_read_byte((uint8_t *)(addr_stateMode));
 //
-//	nTM = //eeprom_read_byte((uint8_t *)(addr_nTM));
+////	waitPowerOn_min_standBy = //eeprom_read_byte((uint8_t *)(addr_standBy_min));
+////	waitPowerOn_min = waitPowerOn_min_standBy;
+////
+////	uint8_t lbyte, hbyte;
+//////	hbyte = eeprom_read_byte((uint8_t *)(addr_LevelRef+1));
+//////	lbyte = eeprom_read_byte((uint8_t *)(addr_LevelRef));
+////	levelRef_10bit = ((hbyte << 8) | lbyte);
+////
+//////	hbyte = eeprom_read_byte((uint8_t *)(addr_motorTimerE+1));
+//////	lbyte = eeprom_read_byte((uint8_t *)(addr_motorTimerE));
+////	motorTimerE = ((hbyte << 8) | lbyte);
+//
+////	PRessureRef = //eeprom_read_byte((uint8_t *)(addr_PRessureRef));
+////	PRessureRef_Valve = //eeprom_read_byte((uint8_t *)(addr_PRessureRef_Valve));
+////	PRessurePer = //eeprom_read_byte((uint8_t *)(addr_PREssurePer));
+////	PRessureMax_Sensor = //eeprom_read_byte((uint8_t *)(addr_PRessureMax_Sensor));
+////
+//	nTM = eeprom.read(eeprom.addr_nTM); //eeprom_read_byte((uint8_t *)(addr_nTM));
+//
 //	int i;
 //	for(i=0;i<9;i++)
 //	{
-////		HourOnTM[i] = //eeprom_read_byte((uint8_t *)(addr_HourOnTM+i));
-////		MinOnTM[i] = //eeprom_read_byte((uint8_t *)(addr_MinOnTM+i));
+//		HourOnTM[i] = eeprom.read(eeprom.addr_HourOnTM+i); //eeprom_read_byte((uint8_t *)(addr_HourOnTM+i));
+//		MinOnTM[i] = eeprom.read(eeprom.addr_MinOnTM+i);//eeprom_read_byte((uint8_t *)(addr_MinOnTM+i));
 //	}
 
 }
@@ -1277,14 +1132,15 @@ $1:h:HHMMSS;		- Ajustes do calendário;
 $2:DevName;			- Change bluetooth name;
 	$2:Vassalo;		- Altera o nome do bluetooth para "Vassalo";
 
+$4:x:				- Is this applied fo stm32f10xxx series only;
+	$4:r:07;		- Read address 0x07 * 2 of currently page;
+	$4:w:07:03;		- Write variable 3 on address 7 of currently page;
+	$4:f:64:03;		- fill page 64 with 3 value;
+	$4:e:64;		- erase page 64;
+
 $3X;				- Acionamento do motor;
 	$31;			- liga o motor;
 	$30;			- desliga o motor;
-
-$4:a1:0;
-$4:a2:0;
-$4:a3:0;
-$4:a4:0;
 
 $5:n:X; ou $5:hX:HHMM;
 	$5:n:9;			- Configura para acionar 9 vezes. Necessário configurar 9 horários;
@@ -1524,6 +1380,7 @@ $6X;				- Modos de funcionamento;
 					tm.Second = (uint8_t) atoi(aux);
 
 //					RTC.write(tm);
+					rtc.write(tm);
 					summary_Print(0);
 				}
 				// 	Set-up date -> $1:d:DDMMAAAA;
@@ -1549,6 +1406,7 @@ $6X;				- Modos de funcionamento;
 					tm.Year = (uint8_t) (atoi(aux2)-1970);
 
 //					RTC.write(tm);
+					rtc.write(tm);
 
 					summary_Print(0);
 
@@ -1613,7 +1471,91 @@ $6X;				- Modos de funcionamento;
 			}
 			break;
 // -----------------------------------------------------------------
+			case 4: 	// FLASH store test, //$4:r:23; and $4:w:23:03;
+			{
+				if(sInstr[1]==':' && sInstr[2]=='r' && sInstr[3]==':' && sInstr[6]==';')
+				{	// $4:r:05; read 05*2 address of page block
+					// Getting the parameters
+					aux[0] = sInstr[4];
+					aux[1] = sInstr[5];
+					aux[2] = '\0';
+					uint8_t addrt = (uint8_t) atoi(aux);
+					uint8_t var = eeprom.read(eeprom.pageSet, addrt);
+					sprintf(buffer,"EE read: %d ", var);
+					Serial.println(buffer);
 
+					sprintf(buffer,"Page %d ", eeprom.pageSet);
+					Serial.println(buffer);
+
+					sprintf(buffer,"Address %X ", eeprom.pageAddress(eeprom.pageSet));
+					Serial.println(buffer);
+				}
+				if(sInstr[1]==':' && sInstr[2]=='w' && sInstr[3]==':' && sInstr[6]==':' && sInstr[9]==';')
+				{	// $4:w:03:07;
+					// Getting the parameters
+					aux[0] = sInstr[4];
+					aux[1] = sInstr[5];
+					aux[2] = '\0';
+					uint8_t addrt = (uint8_t) atoi(aux);
+
+					aux[0] = sInstr[7];
+					aux[1] = sInstr[8];
+					aux[2] = '\0';
+					uint8_t var = (uint8_t) atoi(aux);
+
+					eeprom.write(eeprom.pageSet, addrt, var);
+					sprintf(buffer,"EE write: %d ", var);
+					Serial.println(buffer);
+
+					var = eeprom.read(eeprom.pageSet, addrt);
+					sprintf(buffer,"EE read2: %d ", var);
+					Serial.println(buffer);
+
+					sprintf(buffer,"Page %d ", eeprom.pageSet);
+					Serial.println(buffer);
+
+					sprintf(buffer,"Address %X ", eeprom.pageAddress(eeprom.pageSet));
+					Serial.println(buffer);
+				}
+				if(sInstr[1]==':' && sInstr[2]=='f' && sInstr[3]==':' && sInstr[6]==':' && sInstr[9]==';')
+				{	// $4:f:64:07;	fill page 64 with 07 value;
+					// Getting the parameters
+					aux[0] = sInstr[4];
+					aux[1] = sInstr[5];
+					aux[2] = '\0';
+					uint8_t page = (uint8_t) atoi(aux);
+
+					aux[0] = sInstr[7];
+					aux[1] = sInstr[8];
+					aux[2] = '\0';
+					uint8_t var = (uint8_t) atoi(aux);
+
+
+
+					eeprom.writePage(page, (var << 8 | var));
+					sprintf(buffer,"Filled page %d ", page);
+					Serial.println(buffer);
+
+					sprintf(buffer,"Address %X ", eeprom.pageAddress(page));
+					Serial.println(buffer);
+				}
+				if(sInstr[1]==':' && sInstr[2]=='e' && sInstr[3]==':' && sInstr[6]==';')
+				{	// $4:e:64;	erase page 64
+					// Getting the parameters
+					aux[0] = sInstr[4];
+					aux[1] = sInstr[5];
+					aux[2] = '\0';
+					uint8_t page = (uint8_t) atoi(aux);
+
+					eeprom.erasePage(page);
+					sprintf(buffer,":Page %d erased!", page);
+					Serial.println(buffer);
+
+					sprintf(buffer,"Address %X ", eeprom.pageAddress(page));
+					Serial.println(buffer);
+				}
+				break;
+			}
 // -----------------------------------------------------------------
 			case 5: // Command is $5:h1:2130;
 			{
@@ -1628,13 +1570,15 @@ $6X;				- Modos de funcionamento;
 					aux[1] = sInstr[6];
 					aux[2] = '\0';
 					HourOnTM[indexV-1] = (uint8_t) atoi(aux);
+//					eeprom.write(eeprom.addr_HourOnTM+indexV-1, HourOnTM[indexV-1]);
 					//eeprom_write_byte(( uint8_t *)(addr_HourOnTM+indexV-1), HourOnTM[indexV-1]);
 
 					aux[0] = sInstr[7];
 					aux[1] = sInstr[8];
 					aux[2] = '\0';
 					MinOnTM[indexV-1] = (uint8_t) atoi(aux);
-					//eeprom_write_byte(( uint8_t *)(addr_MinOnTM+indexV-1), MinOnTM[indexV-1]);
+//					eeprom.write(eeprom.addr_MinOnTM+indexV-1, MinOnTM[indexV-1]);
+//					eeprom_write_byte(( uint8_t *)(addr_MinOnTM+indexV-1), MinOnTM[indexV-1]);
 
 					summary_Print(5);
 				}
@@ -1645,6 +1589,7 @@ $6X;				- Modos de funcionamento;
 					aux[2] = '\0';
 
 					nTM = (uint8_t) atoi(aux);
+//					eeprom.write(eeprom.addr_nTM, nTM);
 					//eeprom_write_byte(( uint8_t *)(addr_nTM), nTM);
 
 					summary_Print(5);
@@ -1662,6 +1607,7 @@ $6X;				- Modos de funcionamento;
 				aux[1] = sInstr[1];
 				aux[2] = '\0';
 				stateMode = (uint8_t) atoi(aux);
+//				eeprom.write(eeprom.addr_stateMode, stateMode);
 //				//eeprom_write_byte(( uint8_t *)(addr_stateMode), stateMode);
 
 				summary_Print(0);

@@ -92,7 +92,26 @@ void USART::println(char const *s)
 	while(!(USART1->SR & USART_SR_TC));
 	USART1 -> DR = (0x0a & (uint16_t)0x00FF);
 }
-void USART::sendByte(char c)
+void USART::println(int value)
+{
+	char *s = (char *)malloc(8 * sizeof(char));
+	sprintf(s,"%d", value);
+
+	while(*s)
+	{
+		// wait until data register is empty. Transmission complete (TC) bit
+		while(!(USART1->SR & USART_SR_TC));
+		USART1 -> DR = (*s & (uint16_t)0x00FF);
+		s++;
+	}
+
+	while(!(USART1->SR & USART_SR_TC));
+	USART1 -> DR = (0x0d & (uint16_t)0x00FF);
+
+	while(!(USART1->SR & USART_SR_TC));
+	USART1 -> DR = (0x0a & (uint16_t)0x00FF);
+}
+void USART::write(char c)
 {
 	// wait until transmittion complete
 	while( !(USART1-> SR & USART_SR_TC));
@@ -175,7 +194,7 @@ int USART::available()
 {
 	return _USART1_cnt;
 }
-char USART::readByte()
+char USART::read()
 {
 	int i;
 	char data = 0;

@@ -57,16 +57,18 @@ public:
 	const uint8_t addr_PREssurePer 			= 69;		// 1 byte
 
 	void begin_eeprom(void);
-	void routine1(void);
-
-	void write(uint8_t page, uint8_t addr, uint8_t var);
-	uint8_t read(uint8_t page, uint8_t addr);
-
 	void end_eeprom(void);
-	void erasePage(uint8_t page);
 
+	void setPage(uint8_t page);
 	uint32_t pageAddress(uint8_t page);
+
+	void erasePage(uint8_t page);
 	void writePage(uint8_t page, uint16_t value);
+
+	uint8_t read(uint8_t page, uint8_t addr);
+	void write(uint8_t page, uint8_t addr, uint8_t var);
+
+	void routine1(void);
 
 private:
 	void fillArrayFromPage(uint8_t page);
@@ -77,11 +79,18 @@ private:
 void EEPROM::begin_eeprom(void)
 {
 	FLASH_Unlock();		// Unlock the Flash Program Erase controller
-//	EE_Init();			// EEPROM Init
 }
 void EEPROM::end_eeprom(void)
 {
 	FLASH_Lock();
+}
+uint32_t EEPROM::pageAddress(uint8_t page)
+{
+	return (startAddress + page*0x0400);
+}
+void EEPROM::setPage(uint8_t page)
+{
+	pageSet = page;
 }
 void EEPROM::erasePage(uint8_t page)
 {
@@ -133,10 +142,6 @@ void EEPROM::write(uint8_t page, uint8_t addr, uint8_t var)
 
 	// Write page;
 	fillArrayToPage(page);
-}
-uint32_t EEPROM::pageAddress(uint8_t page)
-{
-	return (startAddress + page*0x0400);
 }
 void EEPROM::writePage(uint8_t page, uint16_t value)
 {

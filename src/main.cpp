@@ -2,12 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "Hardware/usart.h"
-#include "Hardware/spi.h"
 
 #include "Modules/nRF24L01p.h"
 
-#include "Hardware/eeprom.h"
 #include "acionna.h"
 #include <time.h>
 #include <stm32f10x.h>
@@ -19,26 +16,6 @@
 
 SPI SerialSPI;
 ACIONNA acn;
-
-TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-TIM_OCInitTypeDef  TIM_OCInitStructure;
-
-__IO int flag_1s;
-
-// Addresses
-const uint8_t addr_stateMode 			= 1;	// 1 bytes
-const uint8_t addr_LevelRef 			= 2;	// 4 bytes
-const uint8_t addr_standBy_min 			= 5;	// 2 bytes
-const uint8_t addr_PRessureRef 			= 7;	// 1 byte
-const uint8_t addr_PRessureRef_Valve	= 8;	// 1 byte
-const uint8_t addr_PRessureMax_Sensor	= 9;	// 1 byte
-const uint8_t addr_motorTimerE 			= 10;	// 2 byte
-const uint8_t addr_HourOnTM 			= 30;	// 9 bytes
-const uint8_t addr_MinOnTM 				= 39;	// nTM byte(s)
-const uint8_t addr_nTM 					= 48;	// 1 byte
-const uint8_t addr_motorTimerStart1 	= 65;	// 2 bytes
-const uint8_t addr_motorTimerStart2 	= 67;	// 2 bytes
-const uint8_t addr_PREssurePer 			= 69;	// 1 byte
 
 // Wake up interrupts
 uint8_t flag_WDRF = 0;			// Watchdog System Reset Flag
@@ -58,18 +35,55 @@ uint8_t flag_PORF = 0;			// Power-on Reset Flag
 
 int main(void)
 {
-	init();
+	init();						// uC basic peripherals setup
 
-	acn.begin_acn();
-	Serial.begin(9600);	// initialize USART1 @ 9600 baud
+	Serial.begin(9600);			// Initialize USART1 @ 9600 baud
+	acn.begin_acn();			// Class acionna statement
+
+	Serial.println("Acionna v2.0");
+
+//	uint8_t var = eeprom.read(eeprom.addr_stateMode);
+//	sprintf(Serial.buffer,"Read1: %d", var);
+//	Serial.println(Serial.buffer);
+//
+//	eeprom.write(eeprom.addr_stateMode, 7);
+//
+//	var = eeprom.read(eeprom.addr_stateMode);
+//	sprintf(Serial.buffer,"Read2: %d", var);
+//	Serial.println(Serial.buffer);
 
 	while(1)
 	{
+//		if(acn.flag_1s)
+//		{
+//			acn.flag_1s = 0;
+//
+//			rtc.getTime();
+//			sprintf(buffer, "%s", ctime(&rtc.rawtime));
+//			Serial.println(buffer);
+//		}
 		acn.comm_Bluetooth();
 
+		acn.refreshVariables();
+
 		acn.handleMessage();
+
+		acn.process_Mode();
 	}
 }
+
+//const char * m()
+//{
+//    char * c = (char *)malloc(6 * sizeof(char));
+//    c = "hello";
+//    return (const char *)c;
+//}
+//
+//int main(int argc, char * argv[])
+//{
+//    const char * d = m();
+//    std::cout << d; // use PCSTR
+//}
 
 
 /*
@@ -93,8 +107,17 @@ void SysTick_Handler(void)
 	}
 	else
 	{
-		acn.flag_1s = 1;
+//		acn.flag_1s = 1;
 		count_1s = 1000000;
+	}
+}
+void RTC_IRQHandler(void){
+	if(RTC->CRL & RTC_CRL_SECF)
+	{
+		RTC->CRL &= ~RTC_CRL_SECF;
+
+		acn.flag_1s = 1;
+		rtc.uptime32++;
 	}
 }
 void USART1_IRQHandler(void)
