@@ -54,7 +54,7 @@ public:
 	const uint8_t addr_nTM 					= 48;		// 1 byte
 	const uint8_t addr_motorTimerStart1 	= 65;		// 2 bytes
 	const uint8_t addr_motorTimerStart2 	= 67;		// 2 bytes
-	const uint8_t addr_PREssurePer 			= 69;		// 1 byte
+	const uint8_t addr_PRessurePer 			= 69;		// 1 byte
 
 	void begin_eeprom(void);
 	void end_eeprom(void);
@@ -65,7 +65,7 @@ public:
 	void erasePage(uint8_t page);
 	void writePage(uint8_t page, uint16_t value);
 
-	uint8_t read(uint8_t page, uint8_t addr);
+	uint16_t read(uint8_t page, uint8_t addr);
 	void write(uint8_t page, uint8_t addr, uint8_t var);
 
 	void routine1(void);
@@ -103,7 +103,7 @@ void EEPROM::erasePage(uint8_t page)
 	FLASH_ClearFlag(FLASH_FLAG_EOP|FLASH_FLAG_PGERR|FLASH_FLAG_WRPRTERR);
 	FLASH_ErasePage(pageAddress(page));//erase the entire page before you can write as I //mentioned
 }
-uint8_t EEPROM::read(uint8_t page, uint8_t addr)
+uint16_t EEPROM::read(uint8_t page, uint8_t addr)
 {
 	fillArrayFromPage(page);
 
