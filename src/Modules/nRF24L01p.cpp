@@ -7,7 +7,33 @@
 
 #include "nRF24L01p.h"
 
-void nRF24L01p::CE(FunctionalState NewState)
+void nRF24L01p::begin_nRF24L01p()
+{
+	configurePins();
+
+	csn(ENABLE);
+	ce(DISABLE);
+	set_PowerUp();
+
+	set_crc(DISABLE);
+	set_ACK_disable();
+	set_250kbps();							// Set low data speed;
+	set_RF_PWR(RF_PWR_0dBm);				// Set RF power output;
+	set_payload_width(0, 2);				// pipe 0 with payload of 2 bytes
+	set_payload_width(1, 2);				// pipe 1 with payload of 2 bytes
+	set_RX_ADDRn(0, nRF24_rx_addr_p0_d, 5);	// Set rx home address;
+	set_TX_ADDR(nRF24_rx_addr_p0_d, 5);		// Set tx destination address;
+	set_state_pipe(0, ENABLE);
+	set_state_pipe(1, DISABLE);
+
+//	uint8_t len = get_payload_width(0);
+//	sprintf(buffer,"len0=%d", len);
+//	USART1_println(buffer);
+
+//	flush_RX();								// flush rx;
+//	set_mode_rx(ENABLE);						// Set PRIM bit
+}
+void nRF24L01p::ce(FunctionalState NewState)
 {
 	assert_param(IS_FUNCTIONAL_STATE(NewState));
 	if (NewState != DISABLE)
@@ -21,7 +47,7 @@ void nRF24L01p::CE(FunctionalState NewState)
 		_delay_us(10);
 	}
 }
-void nRF24L01p::CSN(FunctionalState NewState)
+void nRF24L01p::csn(FunctionalState NewState)
 {
 	assert_param(IS_FUNCTIONAL_STATE(NewState));
 	if (NewState != DISABLE)
@@ -35,7 +61,7 @@ void nRF24L01p::CSN(FunctionalState NewState)
 		//_delay_us(3);
 	}
 }
-void nRF24L01p::Configure()
+void nRF24L01p::configurePins()
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 
@@ -54,50 +80,50 @@ void nRF24L01p::Configure()
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-	beginMaster();
+	set_SPI_to_Master();	// the slave one is the nRF24L01p chip
 }
 uint8_t nRF24L01p::read_register(uint8_t reg)
 {
 	uint8_t nRF24_rx;
 
-	CSN(DISABLE);
+	csn(DISABLE);
 	transfer_Byte(R_REGISTER | ( REGISTER_MASK & reg ) );
 	nRF24_rx = transfer_Byte(NOP);
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	return nRF24_rx;
 }
 uint8_t nRF24L01p::read_register_buf(uint8_t reg, uint8_t* buf, uint8_t length)
 {
 	uint8_t status;
-	CSN(DISABLE);
+	csn(DISABLE);
 	status = transfer_Byte(R_REGISTER | ( REGISTER_MASK & reg ) );
 	while ( length-- ){
 		*buf++ = transfer_Byte(NOP);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	return status;
 }
 uint8_t nRF24L01p::write_register(uint8_t reg, uint8_t value)
 {
 	uint8_t status;
-	CSN(DISABLE);
+	csn(DISABLE);
 	status = transfer_Byte(W_REGISTER | ( REGISTER_MASK & reg ) );
 	transfer_Byte(value);
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	return status;
 }
 uint8_t nRF24L01p::write_register_buf(uint8_t reg, uint8_t* buf, uint8_t length)
 {
 	uint8_t status;
-	CSN(DISABLE);
+	csn(DISABLE);
 	status = transfer_Byte(W_REGISTER | ( REGISTER_MASK & reg ) );
 	while(length--){
 		transfer_Byte(*buf++);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	return status;
 }
@@ -156,7 +182,7 @@ void nRF24L01p::set_RF_PWR(uint8_t RF_power)
 	}
 	regValue = write_register(RF_SETUP, regValue);
 }
-void nRF24L01p::set_RX_mode(FunctionalState state)
+void nRF24L01p::set_mode_rx(FunctionalState state)
 {
 	if(state == ENABLE)
 	{
@@ -175,7 +201,7 @@ void nRF24L01p::set_RX_mode(FunctionalState state)
 		write_register(NRF_STATUS, (1 << RX_DR) | (1<<TX_DS) | (1<<MAX_RT));
 
 		// Set CE to high and wait 130 us;
-		CE(ENABLE);
+		ce(ENABLE);
 //		//_delay_us(130);
 
 //		sprintf(buffer,"rxmodeON:%d",regValue);
@@ -185,7 +211,7 @@ void nRF24L01p::set_RX_mode(FunctionalState state)
 	}
 	else
 	{
-		CE(DISABLE);
+		ce(DISABLE);
 //		//_delay_us(130);
 //		sprintf(buffer,"rxmodeOFF");
 //		USART1_println(buffer);
@@ -193,7 +219,7 @@ void nRF24L01p::set_RX_mode(FunctionalState state)
 		stateMode = 1;
 	}
 }
-void nRF24L01p::set_TX_mode(FunctionalState state)
+void nRF24L01p::set_mode_tx(FunctionalState state)
 {
 	if(state == ENABLE)
 	{
@@ -208,14 +234,14 @@ void nRF24L01p::set_TX_mode(FunctionalState state)
 //		USART1_println(buffer);
 //		USART1_println("sent!");
 		// Set CE to high and wait 130 us;
-		CE(ENABLE);
+		ce(ENABLE);
 //		//_delay_us(130);
 
 		stateMode = 3;
 	}
 	else
 	{
-		CE(DISABLE);
+		ce(DISABLE);
 		//_delay_us(130);
 
 		stateMode = 1;
@@ -227,13 +253,13 @@ void nRF24L01p::set_RX_ADDRn(uint8_t pipe, uint8_t *addr_rx, uint8_t addr_length
 	uint8_t regAddr = RX_ADDR_P0 + pipe;
 	int i;
 
-	CSN(DISABLE);
+	csn(DISABLE);
 	transfer_Byte(W_REGISTER | ( REGISTER_MASK & regAddr ) );
 	for(i=0; i<addr_length; i++)
 	{
 		transfer_Byte(addr_rx[i]);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 
 #ifdef debug
 	for(i=0; i<addr_length; i++)
@@ -249,13 +275,13 @@ void nRF24L01p::get_RX_ADDRn(uint8_t pipe, uint8_t *addr_rx, uint8_t addr_length
 	uint8_t regAddr = RX_ADDR_P0 + pipe;
 	int i;
 
-	CSN(DISABLE);
+	csn(DISABLE);
 	transfer_Byte(R_REGISTER | ( REGISTER_MASK & regAddr) );
 	for(i=0; i<addr_length; i++)
 	{
 		addr_rx[i] = transfer_Byte(NOP);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	for(i=0; i<addr_length; i++)
 	{
@@ -269,17 +295,17 @@ void nRF24L01p::set_TX_ADDR(uint8_t *addr, uint8_t addr_length)
 	uint8_t regAddr = TX_ADDR;
 	int i;
 
-	CSN(DISABLE);
+	csn(DISABLE);
 	transfer_Byte(W_REGISTER | ( REGISTER_MASK & regAddr ) );
 	for(i=0; i<addr_length; i++)
 	{
 		transfer_Byte(addr[i]);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 }
 void nRF24L01p::get_TX_ADDR(uint8_t *addr_tx, uint8_t addr_length)
 {
-	CSN(DISABLE);
+	csn(DISABLE);
 	transfer_Byte(R_REGISTER | ( REGISTER_MASK & TX_ADDR) );
 	int i;
 	for(i=0; i<addr_length; i++)
@@ -287,7 +313,7 @@ void nRF24L01p::get_TX_ADDR(uint8_t *addr_tx, uint8_t addr_length)
 //		nRF24_tx_addr[i] = transfer_Byte(NOP);
 		addr_tx[i] = transfer_Byte(NOP);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	for(i=0; i<addr_length; i++)
 	{
@@ -300,13 +326,13 @@ uint8_t nRF24L01p::write_payload(uint8_t *vect, uint8_t length)
 {
 	uint8_t status;
 	int i;
-	CSN(DISABLE);
+	csn(DISABLE);
 	status = transfer_Byte(W_TX_PAYLOAD);
 	for(i=0; i<length; i++)
 	{
 		transfer_Byte(vect[i]);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	return status;
 }
@@ -314,30 +340,30 @@ uint8_t nRF24L01p::read_payload(uint8_t *vect_rx, uint8_t length)
 {
 	int i, status;
 
-	CSN(DISABLE);
+	csn(DISABLE);
 	status = transfer_Byte(R_RX_PAYLOAD);
 
 	for(i=0; i<length; i++)
 	{
 		vect_rx[i] = transfer_Byte(NOP);
 	}
-	CSN(ENABLE);
+	csn(ENABLE);
 
 	return status;
 }
 void nRF24L01p::flush_RX(void)
 {
-	CSN(DISABLE);
+	csn(DISABLE);
 	transfer_Byte(FLUSH_RX);
-	CSN(ENABLE);
+	csn(ENABLE);
 }
 void nRF24L01p::flush_TX(void)
 {
-	CSN(DISABLE);
+	csn(DISABLE);
 	transfer_Byte(FLUSH_TX);
-	CSN(ENABLE);
+	csn(ENABLE);
 }
-void nRF24L01p::set_CRC(FunctionalState state)
+void nRF24L01p::set_crc(FunctionalState state)
 {
 	uint8_t regValue;
 	regValue = read_register(NRF_CONFIG);
@@ -378,7 +404,7 @@ int nRF24L01p::get_RPD()
 {
 	return read_register(RPD);
 }
-void nRF24L01p::set_pipe_state(uint8_t pipe, FunctionalState state)
+void nRF24L01p::set_state_pipe(uint8_t pipe, FunctionalState state)
 {
 	uint8_t regValue;
 
@@ -407,7 +433,7 @@ void nRF24L01p::set_PowerUp()
 }
 void nRF24L01p::set_PowerDown()
 {
-	CE(DISABLE);
+	ce(DISABLE);
 
 	uint8_t regValue;
 	regValue = read_register(NRF_CONFIG);
@@ -522,33 +548,7 @@ void nRF24L01p::reset(void)
 
 	write_register(RF_SETUP, 0x0E);
 }
-void nRF24L01p::beginRF24()
-{
-	beginMaster();
-	Configure();
-	CSN(ENABLE);
-	CE(DISABLE);
-	set_PowerUp();
-
-	set_CRC(DISABLE);
-	set_ACK_disable();
-	set_250kbps();
-	set_RF_PWR(RF_PWR_0dBm);
-	set_payload_width(0, 2);
-	set_payload_width(1, 2);
-	set_RX_ADDRn(0, nRF24_rx_addr_p0_d, 5);	// Set rx address;
-	set_TX_ADDR(nRF24_rx_addr_p0_d, 5);		// Set destination address;
-	set_pipe_state(0, ENABLE);
-	set_pipe_state(1, DISABLE);
-
-//	uint8_t len = get_payload_width(0);
-//	sprintf(buffer,"len0=%d", len);
-//	USART1_println(buffer);
-
-//	flush_RX();								// flush rx;
-//	set_RX_mode(ENABLE);						// Set PRIM bit
-}
-void nRF24L01p::test()
+void nRF24L01p::sendTestSignal(void)
 {
 	// Bit 1: PWR_UP =1
 	write_register(NRF_CONFIG, 0x02);
@@ -557,13 +557,13 @@ void nRF24L01p::test()
 	// Bit 7: CONT_WAVE = 1; Bit 4: PLL_LOCK = 1
 	write_register(RF_SETUP, 0x9F);
 
-	CE(ENABLE);
+	ce(ENABLE);
 }
 void nRF24L01p::summary()
 {
-	uint8_t regValue;
+//	uint8_t regValue;
 
-	regValue = read_register(NRF_CONFIG);
+//	regValue = read_register(NRF_CONFIG);
 //	sprintf(buffer,"PWR_UP: %d", (regValue & (1<<PWR_UP)));
 //	USART1_println(buffer);
 }
@@ -584,8 +584,8 @@ void nRF24L01p::send_2bytes()
 		vect[1] = 0x42;
 	}
 
-	set_RX_mode(DISABLE);
-	set_TX_mode(ENABLE);
+	set_mode_rx(DISABLE);
+	set_mode_tx(ENABLE);
 
 //			while((~nRF24_read_register(NRF_STATUS)) & (1 << TX_DS))
 //			{
@@ -603,7 +603,7 @@ void nRF24L01p::send_2bytes()
 //			}
 //	sprintf(buffer,"sent:%c %c", vect[0], vect[1]);
 //	USART1_println(buffer);
-	set_TX_mode(DISABLE);
+	set_mode_tx(DISABLE);
 //			//_delay_ms(10);
-	set_RX_mode(ENABLE);
+	set_mode_rx(ENABLE);
 }
