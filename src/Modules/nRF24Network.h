@@ -17,7 +17,9 @@ public:
 	unsigned char *_data;
 };
 
-class nRF24Network : nRF24L01p {
+nRF24L01p nRFradio;
+
+class nRF24Network{
 public:
 	uint8_t _addrHost;
 	uint8_t _topology;
@@ -31,16 +33,31 @@ public:
 
 	};
 
-	void beginNetwork(uint8_t addrHost, uint8_t topology);
+	void begin_Network(uint8_t addrHost, uint8_t topology);
 	void pkt_send(uint8_t addrDest, uint8_t size, uint8_t *frame);
 	uint8_t pkt_receive();
 	void pkt_available();
 	void ping();
 
+	void handleRadioMessage(void);
 
 private:
 };
 
+void nRF24Network::begin_Network(uint8_t addrHost, uint8_t topology)
+{
 
+}
+void nRF24Network::handleRadioMessage(void)
+{
+	// receive a packet
+
+	// open the header
+
+	// decide what to do
+
+	// do
+
+}
 
 #endif /* NRF24NETWORK_H_ */

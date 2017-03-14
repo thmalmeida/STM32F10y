@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
-
-#include "Modules/nRF24L01p.h"
 
 #include "acionna.h"
 #include <time.h>
@@ -11,49 +8,33 @@
 #include <stm32f10x_rtc.h>
 #include "stm32f10x_it.h"
 
-#define master
-#define debug
-
 SPI SerialSPI;
 ACIONNA acn;
 
 // Wake up interrupts
-uint8_t flag_WDRF = 0;			// Watchdog System Reset Flag
-uint8_t flag_BORF = 0;			// Brown-out Reset Flag
-uint8_t flag_EXTRF = 0;			// External Reset Flag
-uint8_t flag_PORF = 0;			// Power-on Reset Flag
-
-//uint8_t flag_waitPowerOn = 1;	// Minutes before start motor after power line ocasionally down
-//uint8_t waitPowerOn_min_standBy=0;
-//uint8_t waitPowerOn_min = 0;
-//uint8_t waitPowerOn_sec = 0;
-////uint8_t powerOff_min = 0;
-////uint8_t powerOff_sec = 0;
-//// Motor timers in milliseconds
-//uint8_t motorTimerStart1 = 35;
-//uint16_t motorTimerStart2 = 200;
+//uint8_t flag_WDRF = 0;			// Watchdog System Reset Flag
+//uint8_t flag_BORF = 0;			// Brown-out Reset Flag
+//uint8_t flag_EXTRF = 0;			// External Reset Flag
+//uint8_t flag_PORF = 0;			// Power-on Reset Flag
 
 int main(void)
 {
-	init();						// uC basic peripherals setup
+	init();							// uC basic peripherals setup
 
-	Serial.begin(9600);			// Initialize USART1 @ 9600 baud
-	acn.begin_acn();			// Class acionna statement
-
+	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
+	acn.begin_acn();				// Class acionna statement
 	Serial.println("Acionna v2.0");
-
-//	uint8_t var = eeprom.read(eeprom.addr_stateMode);
-//	sprintf(Serial.buffer,"Read1: %d", var);
-//	Serial.println(Serial.buffer);
-//
-//	eeprom.write(eeprom.addr_stateMode, 7);
-//
-//	var = eeprom.read(eeprom.addr_stateMode);
-//	sprintf(Serial.buffer,"Read2: %d", var);
-//	Serial.println(Serial.buffer);
 
 	while(1)
 	{
+		acn.comm_Bluetooth();
+
+		acn.refreshVariables();
+
+		acn.handleMessage();
+
+		acn.process_Mode();
+
 //		if(acn.flag_1s)
 //		{
 //			acn.flag_1s = 0;
@@ -62,13 +43,6 @@ int main(void)
 //			sprintf(buffer, "%s", ctime(&rtc.rawtime));
 //			Serial.println(buffer);
 //		}
-		acn.comm_Bluetooth();
-
-		acn.refreshVariables();
-
-		acn.handleMessage();
-
-		acn.process_Mode();
 	}
 }
 
@@ -111,13 +85,13 @@ void SysTick_Handler(void)
 		count_1s = 1000000;
 	}
 }
-void RTC_IRQHandler(void){
+void RTC_IRQHandler(void)
+{
 	if(RTC->CRL & RTC_CRL_SECF)
 	{
 		RTC->CRL &= ~RTC_CRL_SECF;
-
-		acn.flag_1s = 1;
 		rtc.uptime32++;
+		acn.flag_1s = 1;
 	}
 }
 void USART1_IRQHandler(void)
@@ -225,6 +199,7 @@ void SPI1_IRQHandler(void)
 	}
 #endif
 }
+
 }
 /*
  * Interruptions sequence END

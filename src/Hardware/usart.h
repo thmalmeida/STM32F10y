@@ -15,9 +15,10 @@
 class USART {
 public:
 
-	char buffer[30];
+	static const int bufferSize = 60;
+	char buffer[bufferSize];
 	volatile int _USART1_cnt;
-	unsigned char _received_string[50];
+	unsigned char _received_string[bufferSize];
 //	extern __IO int USART1_cnt;
 //	extern __IO char received_string[MAX_STRLEN+1]; // this will hold the recieved string
 

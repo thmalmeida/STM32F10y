@@ -244,7 +244,7 @@ void init(void)
 {
 	SystemInit(); 		// Setup STM32 system (clock, PLL and Flash configuration)
 //	ADC1_Init();
-	IO_Init();
+//	IO_Init();
 	SysTick_Init();
 }
 void init_WDT(void)

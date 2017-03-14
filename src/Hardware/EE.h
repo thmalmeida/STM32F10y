@@ -33,9 +33,7 @@ public:
 
 	uint8_t pageSet = 64;
 
-	static const uint16_t pageBlockSize = 0x0400;
-
-	static const int pageSize = 1024;
+	static const uint16_t pageSize = 0x0400;
 	uint16_t memVect[pageSize];
 
 //	ErrorStatus  HSEStartUpStatus;
@@ -55,6 +53,7 @@ public:
 	const uint8_t addr_motorTimerStart1 	= 65;		// 2 bytes
 	const uint8_t addr_motorTimerStart2 	= 67;		// 2 bytes
 	const uint8_t addr_PRessurePer 			= 69;		// 1 byte
+	const uint8_t addr_rtc_PRL				= 80; 		// 2 bytes
 
 	void begin_eeprom(void);
 	void end_eeprom(void);
@@ -66,7 +65,7 @@ public:
 	void writePage(uint8_t page, uint16_t value);
 
 	uint16_t read(uint8_t page, uint8_t addr);
-	void write(uint8_t page, uint8_t addr, uint8_t var);
+	void write(uint8_t page, uint8_t addr, uint16_t var);
 
 	void routine1(void);
 
@@ -127,7 +126,7 @@ void EEPROM::fillArrayToPage(uint8_t page)
 	}
 	while(FLASH->SR &= FLASH_SR_BSY);			// 5- Wait for the BSY bit to be reset.
 }
-void EEPROM::write(uint8_t page, uint8_t addr, uint8_t var)
+void EEPROM::write(uint8_t page, uint8_t addr, uint16_t var)
 {
 	if(FLASH->CR & FLASH_CR_LOCK)				// 2- verify if its unlocked
 	{
@@ -142,6 +141,8 @@ void EEPROM::write(uint8_t page, uint8_t addr, uint8_t var)
 
 	// Write page;
 	fillArrayToPage(page);
+
+	end_eeprom();
 }
 void EEPROM::writePage(uint8_t page, uint16_t value)
 {
@@ -161,6 +162,8 @@ void EEPROM::writePage(uint8_t page, uint16_t value)
 		FLASH_ProgramHalfWord((pageAddress(page) + (k)*2), value);
 	}
 	while(FLASH->SR &= FLASH_SR_BSY);			// 5- Wait for the BSY bit to be reset.
+
+	end_eeprom();
 }
 
 

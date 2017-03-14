@@ -7,16 +7,18 @@
 
 #include "nRF24L01p.h"
 
-void nRF24L01p::begin_nRF24L01p()
+nRF24L01p::nRF24L01p()
 {
 	configurePins();
-
+}
+void nRF24L01p::begin_nRF24L01p()
+{
 	csn(ENABLE);
 	ce(DISABLE);
-	set_PowerUp();
+	set_PWR(ENABLE);						// Turn radio on. Goes to stanby I mode;
 
-	set_crc(DISABLE);
-	set_ACK_disable();
+	set_crc(DISABLE);						// disable crc check;
+	set_ACK_disable();						// disable ACK packet;
 	set_250kbps();							// Set low data speed;
 	set_RF_PWR(RF_PWR_0dBm);				// Set RF power output;
 	set_payload_width(0, 2);				// pipe 0 with payload of 2 bytes
@@ -29,7 +31,6 @@ void nRF24L01p::begin_nRF24L01p()
 //	uint8_t len = get_payload_width(0);
 //	sprintf(buffer,"len0=%d", len);
 //	USART1_println(buffer);
-
 //	flush_RX();								// flush rx;
 //	set_mode_rx(ENABLE);						// Set PRIM bit
 }
@@ -39,11 +40,13 @@ void nRF24L01p::ce(FunctionalState NewState)
 	if (NewState != DISABLE)
 	{
 		GPIO_SetBits(nRF24_PORT, nRF24_Pin_CE);
+		ce_pin_state = 1;
 		_delay_us(130);
 	}
 	else
 	{
 		GPIO_ResetBits(nRF24_PORT, nRF24_Pin_CE);
+		ce_pin_state = 0;
 		_delay_us(10);
 	}
 }
@@ -127,22 +130,22 @@ uint8_t nRF24L01p::write_register_buf(uint8_t reg, uint8_t* buf, uint8_t length)
 
 	return status;
 }
-void nRF24L01p::nRF24_PWR(FunctionalState state)
+void nRF24L01p::set_PWR(FunctionalState state)
 {
 	uint8_t regValue;
-
 	regValue = read_register(NRF_CONFIG);
 	if(state == ENABLE)
 	{
 		regValue |=  (1 << PWR_UP);
+		stateRadioMode = standByI;
 	}
 	else
 	{
+		ce(DISABLE);
 		regValue &= ~(1 << PWR_UP);
+		stateRadioMode = powerDown;
 	}
 	write_register(NRF_CONFIG, regValue);
-
-	//_delay_ms(5);
 }
 uint8_t nRF24L01p::get_pipe_payload_len(uint8_t pipe)
 {
@@ -182,7 +185,35 @@ void nRF24L01p::set_RF_PWR(uint8_t RF_power)
 	}
 	regValue = write_register(RF_SETUP, regValue);
 }
-void nRF24L01p::set_mode_rx(FunctionalState state)
+uint8_t nRF24L01p::get_stateMode(void)
+{
+	uint8_t regValue;
+
+	regValue = read_register(NRF_CONFIG);
+	ce_pin_state = GPIO_ReadInputDataBit(nRF24_PORT, nRF24_Pin_CE);
+
+	if(ce_pin_state && (regValue & 0x03))
+	{
+		return modeRX;
+	}
+	else if(ce_pin_state && (regValue & 0x02))
+	{
+		return modeTX;
+	}
+	else if(!ce_pin_state && (regValue & 0x02))
+	{
+		return standByI;
+	}
+	else if(!ce_pin_state && !(regValue & 0x03))
+	{
+		return powerDown;
+	}
+	else
+	{
+		return 0;
+	}
+}
+uint8_t nRF24L01p::set_mode_rx(FunctionalState state)
 {
 	if(state == ENABLE)
 	{
@@ -197,56 +228,115 @@ void nRF24L01p::set_mode_rx(FunctionalState state)
 		regValue |= (1 << PRIM_RX);
 		write_register(NRF_CONFIG, regValue);
 
-		// Just clear these bits
+								// Just clear these bits
 		write_register(NRF_STATUS, (1 << RX_DR) | (1<<TX_DS) | (1<<MAX_RT));
 
-		// Set CE to high and wait 130 us;
 		ce(ENABLE);
-//		//_delay_us(130);
+		_delay_us(130);			// Set CE to high and wait 130 us;
 
-//		sprintf(buffer,"rxmodeON:%d",regValue);
-//		USART1_println(buffer);
+//		sprintf(Serial.buffer,"rxmodeON:%d",regValue);
+//		Serial.println(Serial.buffer);
 
-		stateMode = 2;
+		stateRadioMode = modeRX;
 	}
 	else
 	{
 		ce(DISABLE);
-//		//_delay_us(130);
-//		sprintf(buffer,"rxmodeOFF");
-//		USART1_println(buffer);
+		_delay_us(130);
+//		sprintf(Serial.buffer,"rxmodeOFF");
+//		Serial.println(Serial.buffer);
 
-		stateMode = 1;
+		stateRadioMode = standByI;
 	}
+
+	return read_register(NRF_CONFIG);
 }
-void nRF24L01p::set_mode_tx(FunctionalState state)
+uint8_t nRF24L01p::set_mode_tx(FunctionalState state)
 {
 	if(state == ENABLE)
 	{
 		uint8_t regValue;
 
-		// Set PRIM_RX to low (TX mode);
 		regValue = read_register(NRF_CONFIG);
-		regValue &= ~(1 << PRIM_RX);
-		write_register(NRF_CONFIG, regValue);
+		switch(get_stateMode())
+		{
+			case powerDown:
+				set_mode_standbyI();
+				regValue &= ~(1 << PRIM_RX);			// Set PRIM_RX to low (TX mode);
+				write_register(NRF_CONFIG, regValue);
+				ce(ENABLE);
+				_delay_us(15);							// wait for more than 10 us
+				_delay_us(130);							// Tx setting need wait for more 130 us;
 
-//		sprintf(buffer,"CONFIG: %d", regValue);
-//		USART1_println(buffer);
-//		USART1_println("sent!");
-		// Set CE to high and wait 130 us;
-		ce(ENABLE);
-//		//_delay_us(130);
+				return get_stateMode();
+				break;
 
-		stateMode = 3;
+			case standByI:
+				regValue &= ~(1 << PRIM_RX);			// Set PRIM_RX to low (TX mode);
+				write_register(NRF_CONFIG, regValue);
+				ce(ENABLE);
+				_delay_us(15);							// wait for more than 10 us
+				_delay_us(130);							// Tx setting need wait for more 130 us;
+
+				return get_stateMode();
+				break;
+
+			case modeRX:
+				ce(DISABLE);
+				_delay_us(130);
+
+				regValue &= ~(1 << PRIM_RX);			// Set PRIM_RX to low (TX mode);
+				write_register(NRF_CONFIG, regValue);
+
+				ce(ENABLE);
+				_delay_us(15);							// wait for more than 10 us
+				_delay_us(130);							// Tx setting need wait for more 130 us;
+
+				return get_stateMode();
+				break;
+
+			default:
+				return 0;
+				break;
+		}
 	}
 	else
 	{
 		ce(DISABLE);
-		//_delay_us(130);
-
-		stateMode = 1;
+		_delay_us(130);
+		return get_stateMode();
 	}
 
+}
+uint8_t nRF24L01p::set_mode_standbyI()
+{
+	uint8_t state = get_stateMode();
+
+	switch (state)
+	{
+		case powerDown:
+			set_PWR(ENABLE);
+			return 1;
+			break;
+
+		case modeRX:
+			set_mode_rx(DISABLE);
+			return 1;
+
+		case modeTX:
+			set_mode_tx(DISABLE);
+			return 1;
+
+		default:
+			return 0;
+			break;
+	}
+}
+uint8_t nRF24L01p::set_mode_powerDown()
+{
+	set_PWR(DISABLE);
+
+	return !(read_register(NRF_CONFIG) & 0x02);
 }
 void nRF24L01p::set_RX_ADDRn(uint8_t pipe, uint8_t *addr_rx, uint8_t addr_length)
 {
@@ -400,6 +490,11 @@ void nRF24L01p::set_2Mbps()
 	regValue = (regValue & 0b11011111) | 0b00001000;	// Reset bit 5; Set bit 3;
 	regValue = write_register(RF_SETUP, regValue);
 }
+uint8_t nRF24L01p::get_dataRate()
+{
+
+	return 0;
+}
 int nRF24L01p::get_RPD()
 {
 	return read_register(RPD);
@@ -419,28 +514,6 @@ void nRF24L01p::set_state_pipe(uint8_t pipe, FunctionalState state)
 		regValue &= ~(1 << pipe);
 	}
 	write_register(EN_RXADDR, regValue);
-}
-void nRF24L01p::set_PowerUp()
-{
-	uint8_t regValue;
-	regValue = read_register(NRF_CONFIG);
-	regValue |= (1 << PWR_UP);
-	regValue = write_register(NRF_CONFIG, regValue);
-
-	stateMode = 1;
-
-	//_delay_ms(5);
-}
-void nRF24L01p::set_PowerDown()
-{
-	ce(DISABLE);
-
-	uint8_t regValue;
-	regValue = read_register(NRF_CONFIG);
-	regValue &= ~(1 << PWR_UP);
-	regValue = write_register(NRF_CONFIG, regValue);
-
-	stateMode = 0;
 }
 void nRF24L01p::set_ACK(uint8_t pipe, FunctionalState state)
 {
@@ -541,7 +614,7 @@ void nRF24L01p::openReadingPipe(void)//(uint8_t pipe, const uint8_t *addr)
 {
 
 }
-void nRF24L01p::reset(void)
+void nRF24L01p::set_RST(void)
 {
 	write_register(NRF_CONFIG, 0x08);
 //	write_register(EN_AA, 0x3F);
@@ -607,3 +680,24 @@ void nRF24L01p::send_2bytes()
 //			//_delay_ms(10);
 	set_mode_rx(ENABLE);
 }
+
+
+
+
+//void nRF24L01p::set_PowerUp()
+//{
+//	uint8_t regValue;
+//	regValue = read_register(NRF_CONFIG);
+//	regValue |= (1 << PWR_UP);
+//	regValue = write_register(NRF_CONFIG, regValue);
+//
+//
+//}
+//void nRF24L01p::set_PowerDown()
+//{
+//	ce(DISABLE);
+//	uint8_t regValue;
+//	regValue = read_register(NRF_CONFIG);
+//	regValue &= ~(1 << PWR_UP);
+//	regValue = write_register(NRF_CONFIG, regValue);
+//}

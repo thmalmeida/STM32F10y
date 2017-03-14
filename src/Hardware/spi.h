@@ -14,6 +14,7 @@
 #include <time.h>
 
 #include <stm32f10x.h>
+#include <stm32f10x_spi.h>
 #include "../stm32f10x_it.h"
 
 // SPI Defines
@@ -48,8 +49,9 @@ public:
 
 	unsigned char SPI_received_string[50]; // this will hold the recieved string
 
-	void beginMaster();
-	void beginSlave();
+	void set_SPI_to_Master();
+	void set_SPI_to_Slave();
+
 	void print(char const *s);
 	unsigned char transfer_Byte(uint16_t Data);
 	unsigned char writeByte(uint16_t Data);

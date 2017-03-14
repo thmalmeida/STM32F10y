@@ -6,7 +6,7 @@
  */
 #include "spi.h"
 
-void SPI::beginMaster()
+void SPI::set_SPI_to_Master()
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
@@ -70,7 +70,7 @@ void SPI::beginMaster()
 
 	SPI_Cmd(SPI1, ENABLE);
 }
-void SPI::beginSlave()
+void SPI::set_SPI_to_Slave()
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);

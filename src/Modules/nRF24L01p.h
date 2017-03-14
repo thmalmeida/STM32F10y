@@ -160,20 +160,16 @@ public:
 
 	uint8_t address[5] = { 0xCC,0xCE,0xCC,0xCE,0xCC };
 	uint8_t flag_nRF24_IRQ = 0;
-	typedef enum states0 {
-		powerDown,
-		standByI,
-		modeRX,
-		modeTX,
-		standByII
-	}stateMachine;
-	/*
-	 * 0 = power down
-	 * 1 = power up
-	 * 2 = rx mode
-	 * 3 = tx mode
-	 */
-	uint8_t stateMode = 0;
+	typedef enum statesNRF24_type {
+		powerDown = 1,			// 1 = power down
+		standByI,				// 2 = power up
+		modeRX,					// 3 = rx mode;
+		modeTX,					// 4 = tx mode;
+		standByII				// 5 = tx trasition mode with TX fifo empty
+	}stateNRF24L01;
+
+	stateNRF24L01 stateRadioMode = powerDown;
+
 	uint8_t nRF24_rx_addr_p0[5];
 	uint8_t nRF24_rx_addr_p0_d[5] =	{0xB3, 0xB4, 0xB5, 0xB6, 0x05};
 	//uint8_t nRF24_tx_addr[5];
@@ -181,32 +177,33 @@ public:
 	uint8_t vect[2] = {0x41, 0x42};
 	uint8_t nRF24_flag_send_cont =0;
 
+	uint8_t ce_pin_state = 0;
+
+	nRF24L01p();								// Constructor
 	void begin_nRF24L01p();
-	uint8_t read_register(uint8_t reg);
-	uint8_t read_register_buf(uint8_t reg, uint8_t* buf, uint8_t length);
-	uint8_t write_register(uint8_t reg, uint8_t value);
-	uint8_t write_register_buf(uint8_t reg, uint8_t* buf, uint8_t length);
-	void nRF24_PWR(FunctionalState state);
-	uint8_t get_pipe_payload_len(uint8_t pipe);
-	void set_RF_PWR(uint8_t RF_power);
-	void set_mode_rx(FunctionalState state);
-	void set_mode_tx(FunctionalState state);
+	void set_PWR(FunctionalState state);
+	uint8_t set_mode_rx(FunctionalState state);
+	uint8_t set_mode_tx(FunctionalState state);
+	uint8_t set_mode_standbyI();
+	uint8_t set_mode_powerDown();
+	uint8_t get_stateMode();
 	void set_RX_ADDRn(uint8_t pipe, uint8_t *addr_rx, uint8_t addr_length);
 	void get_RX_ADDRn(uint8_t pipe, uint8_t *addr_rx, uint8_t addr_length);
 	void set_TX_ADDR(uint8_t *addr, uint8_t addr_length);
 	void get_TX_ADDR(uint8_t *addr_tx, uint8_t addr_length);
+	uint8_t get_pipe_payload_len(uint8_t pipe);
 	uint8_t write_payload(uint8_t *vect, uint8_t length);
 	uint8_t read_payload(uint8_t *vect_rx, uint8_t length);
 	void flush_RX(void);
 	void flush_TX(void);
 	void set_crc(FunctionalState state);
+	void set_RF_PWR(uint8_t RF_power);
 	void set_250kbps();
 	void set_1Mbps();
 	void set_2Mbps();
+	uint8_t get_dataRate();
 	int get_RPD();
 	void set_state_pipe(uint8_t pipe, FunctionalState state);
-	void set_PowerUp();
-	void set_PowerDown();
 	void set_ACK(uint8_t pipe, FunctionalState state);
 	void set_Auto_Retransmit(uint8_t wait_time, uint8_t arc);
 	void set_payload_width(uint8_t pipe, uint8_t length);
@@ -216,14 +213,18 @@ public:
 	int IRQ();
 	uint8_t poll_RX();
 	void openReadingPipe(void);//(uint8_t pipe, const uint8_t *addr)
-	void reset(void);
+	void set_RST(void);
 	void sendTestSignal(void);
 	void summary();
 	void send_2bytes();
 
+private:
 	void configurePins();
 	void ce(FunctionalState NewState);
 	void csn(FunctionalState NewState);
 
-private:
+	uint8_t read_register(uint8_t reg);
+	uint8_t read_register_buf(uint8_t reg, uint8_t* buf, uint8_t length);
+	uint8_t write_register(uint8_t reg, uint8_t value);
+	uint8_t write_register_buf(uint8_t reg, uint8_t* buf, uint8_t length);
 };

@@ -42,6 +42,7 @@
 
 #include <stm32f10x.h>
 
+#include "Modules/nRF24L01p.h"
 #include "Hardware/rtc.h"
 #include "Hardware/adc.h"
 #include "Hardware/usart.h"
@@ -68,70 +69,37 @@ enum states01 periodo = redTime;
 
 USART Serial;
 EEPROM 	eeprom;
-class ACIONNA : GPIO , ADC, USART, EEPROM {
+nRF24L01p radio;
+RTCi rtc;
+
+class ACIONNA : public GPIO , ADC {
 public:
 
 	tmElements_t tm;
 
-	uint8_t enableDecode = 0, opcode;
-	static const uint8_t sInstr_SIZE = 17;
-	uint8_t k, rLength, j;
-	uint8_t j2 = 0;
-	uint8_t flag_frameStartBT = 0;
-	uint8_t enableTranslate_Bluetooth = 0;
-	char aux[3], aux2[5], buffer[60], inChar, sInstr[sInstr_SIZE];
-	char sInstrBluetooth[30];
+	int PRess;								// last pressure converted;
+	int PRessHold;							// max pressure converted on turned on period;
 
-	uint16_t motorTimerE = 0;
-	uint8_t PRessureRef = 0;
-	uint8_t PRessureRef_Valve = 0;
-	uint8_t PRessureMax_Sensor = 100; // units in psi
-	uint8_t PRessurePer = 85;
+	uint8_t stateMode = 0;					// currently state mode machine;
+	uint8_t motorStatus = 0;				// motor state: 1- on, 0- off;
+	uint16_t motorTimerE = 0;				// time elapsed to turn load off;
+	uint8_t PRessureRef = 0;				// max threshold pressure;
+	uint8_t PRessureRef_Valve = 0;			// max threshold valve pressure to turn open;
+	uint8_t PRessureMax_Sensor = 100; 		// sensor max pressure [psi]
+	uint8_t PRessurePer = 85;				// percent pressure bellow nominal to turn load off;
+	uint16_t levelRef_10bit = 0;			// digital 10 bit number to threshold level sensor;
 
-	uint8_t flag_AwaysON = 0;
-	uint8_t flag_timeMatch = 0;
-	uint8_t flag_PressureDown = 1;
-	uint8_t flag_01 = 0;
-	uint8_t flag_02 = 0;
-	uint8_t flag_03 = 0;
+	uint8_t flag_Th = 0;					// thermal relay
+	uint8_t flag_waitPowerOn = 1;			// Minutes before start motor after power line ocasionally down
 
-	uint8_t flag_Th = 0;
+	uint8_t flag_PressureDown = 0;			// flag for pressure down occurrence;
+	uint8_t flag_timeMatch = 0;				// flag when turn on time occurs;
 
-	//uint16_t motor_timerON = 0;
-	//uint16_t motor_timerOFF = 0;
-
-	uint8_t enableSend = 0;
-	uint8_t enableTranslate = 0;
-	uint8_t flagSync = 0;
-	uint8_t countSync = 0;
-	uint8_t flag_debug = 0;
-
-	uint8_t motorStatus = 0;
-	uint8_t flag_waitPowerOn = 1;	// Minutes before start motor after power line ocasionally down
-	uint8_t waitPowerOn_min_standBy=0;
-	uint8_t waitPowerOn_min = 0;
-	uint8_t waitPowerOn_sec = 0;
-	//uint8_t powerOff_min = 0;
-	//uint8_t powerOff_sec = 0;
-	// Motor timers in milliseconds
-	uint8_t motorTimerStart1 = 35;
-	uint16_t motorTimerStart2 = 200;
-
-	uint8_t HourOn  = 21;
-	uint8_t MinOn   = 30;
-	uint8_t HourOff = 6;
-	uint8_t MinOff  = 0;
-
-	uint8_t nTM;
+	uint8_t nTM;							// number of turn on in one day;
 	uint8_t HourOnTM[9];
 	uint8_t MinOnTM[9];
 
-	uint16_t levelRef_10bit = 0;
-	uint8_t stateMode = 0;
-
-
-	// Logs
-	static const int nLog = 7;
+	static const int nLog = 7;				// Logs
 	uint8_t reasonV[nLog];
 	uint8_t hourLog_ON[nLog], minuteLog_ON[nLog];
 	uint8_t hourLog_OFF[nLog], minuteLog_OFF[nLog];
@@ -146,14 +114,23 @@ public:
 	uint16_t timeOff_min = 0;
 	uint8_t  timeOff_sec = 0;
 
-	volatile int flag_1s;
+	const uint8_t motorTimerStart1 = 35;	// delay on transition of k3 off and k2 on
+	const uint16_t motorTimerStart2 = 200;	// delay on transition of k3 off and k2 on
 
-	int PRess;
-	int PRessHold;
-	int Pd = 0;
+	const uint8_t HourOn  = 21;				// fixed season green tax period
+	const uint8_t MinOn   = 30;
+	const uint8_t HourOff = 6;
+	const uint8_t MinOff  = 0;
+
+	uint8_t waitPowerOn_min_standBy = 0;	// when enabled (high) avoid load turn on;
+	uint8_t waitPowerOn_min = 0;
+	uint8_t waitPowerOn_sec = 0;
+
+	volatile int flag_1s;
 
 	void drive_led_on();
 	void drive_led_off();
+	void drive_led_toggle();
 
 	void DefOut_k1();
 	void DefOut_k2();
@@ -199,7 +176,26 @@ public:
 	void handleMessage();
 	void comm_Bluetooth();
 
+	uint8_t enableSend = 0;
+	uint8_t enableTranslate = 0;
+	uint8_t flagSync = 0;
+	uint8_t countSync = 0;
+	uint8_t flag_debug = 0;
+
+	uint8_t enableDecode = 0, opcode;
+	static const uint8_t sInstr_SIZE = 17;
+	uint8_t k, rLength, j;
+	uint8_t j2 = 0;
+	uint8_t flag_frameStartBT = 0;
+	uint8_t enableTranslate_Bluetooth = 0;
+	char aux[3], aux2[5], inChar, sInstr[sInstr_SIZE];
+	char sInstrBluetooth[30];
+
+	uint8_t flag_01 = 0;
+	uint8_t flag_02 = 0;
+	uint8_t flag_03 = 0;
 private:
+
 	void k1_on();
 	void k1_off();
 	void k2_on();
@@ -210,6 +206,7 @@ private:
 
 void ACIONNA::begin_acn()
 {
+	gateConfig(pin_out_led, 1);		// Configure pin led as output;
 	gateConfig(pin_out_k1, 1);
 	gateConfig(pin_out_k2, 1);
 	gateConfig(pin_out_k3, 1);
@@ -218,9 +215,11 @@ void ACIONNA::begin_acn()
 	gateConfig(pin_in_k3, 0);
 	gateConfig(pin_in_Rth, 0);
 
-	rtc.begin_rtc();
-//	eeprom.begin_eeprom();
-//	refreshStoredData();
+	adc_begin();
+	eeprom.begin_eeprom();
+	refreshStoredData();
+
+	rtc.begin_rtc(0, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
 }
 bool ACIONNA::readPin_Rth()
 {
@@ -245,6 +244,10 @@ void ACIONNA::drive_led_on()
 void ACIONNA::drive_led_off()
 {
 	gateSet(pin_out_led, 0);
+}
+void ACIONNA::drive_led_toggle()
+{
+	gateToggle(pin_out_led);
 }
 void ACIONNA::k1_on()
 {
@@ -305,9 +308,11 @@ void ACIONNA::motor_stop(uint8_t reason)
 
 	driveMotor_OFF();
 	drive_led_off();
-	_delay_ms(1);
+//	_delay_ms(1);
 
 	motorStatus = readPin_k1_PIN();
+//	sprintf(Serial.buffer,"offR:%d", reason);
+//	Serial.println(Serial.buffer);
 }
 void ACIONNA::motor_start()
 {
@@ -337,7 +342,7 @@ void ACIONNA::motor_start()
 		driveMotor_ON(startTypeK);
 		drive_led_on();
 
-		_delay_ms(1);
+//		_delay_ms(1);
 
 		motorStatus = readPin_k1_PIN();
 	}
@@ -466,7 +471,7 @@ double ACIONNA::get_Pressure()
 
 	double PRessMax = Kpsi*PRessureMax_Sensor;
 
-	Pd = adc_readChannel(7);
+	int Pd = adc_readChannel(7);
 	return (PRessMax)*(Pd-102.4)/(921.6-102.4);
 //	(Pd - 103)/(922-103) = (Pa - 0)/(120 - 0);
 }
@@ -712,20 +717,16 @@ void ACIONNA::process_waterPumpControl()
 		}
 	}
 
-	if(stateMode == 5)
+	if(motorStatus && flag_PressureDown)
 	{
-		if(motorStatus && flag_PressureDown)
-		{
-			flag_PressureDown = 0;
-			motor_stop(0x07);
-		}
+		flag_PressureDown = 0;
+		motor_stop(0x07);
 	}
 
 	if(flag_Th)
 	{
 		motor_stop(0x03);
 		stateMode = 0;
-		//eeprom_write_byte(( uint8_t *)(addr_stateMode), stateMode);
 	}
 }
 void ACIONNA::process_motorPeriodDecision()
@@ -794,70 +795,70 @@ void ACIONNA::summary_Print(uint8_t opt)
 	switch (opt)
 	{
 		case 0:
-			sprintf(buffer,"Time:%.2d:%.2d:%.2d %.2d/%.2d/%.4d",tm.Hour, tm.Minute, tm.Second, tm.Day, tm.Month, tm.Year+1970);
-			Serial.print(buffer);
+			sprintf(Serial.buffer,"Time:%.2d:%.2d:%.2d %.2d/%.2d/%.4d",tm.Hour, tm.Minute, tm.Second, tm.Day, tm.Month, tm.Year+1970);
+			Serial.print(Serial.buffer);
 
-//			sprintf(buffer," UP:%.2d:%.2d:%.2d, d:%d m:%d", hour(), minute(), second(), day()-1, month()-1);
-			sprintf(buffer," UP:%.2d:%.2d:%.2d, d:%d m:%d", rtc.rtc0->tm_hour, rtc.rtc0->tm_min, rtc.rtc0->tm_sec, rtc.rtc0->tm_mday-1, rtc.rtc0->tm_mon);
-			Serial.println(buffer);
+//			sprintf(Serial.buffer," UP:%.2d:%.2d:%.2d, d:%d m:%d", hour(), minute(), second(), day()-1, month()-1);
+			sprintf(Serial.buffer," UP:%.2d:%.2d:%.2d, d:%d m:%d", rtc.rtc0->tm_hour, rtc.rtc0->tm_min, rtc.rtc0->tm_sec, rtc.rtc0->tm_mday-1, rtc.rtc0->tm_mon);
+			Serial.println(Serial.buffer);
 
-			sprintf(buffer," P:%d k1:%d",periodo, motorStatus);
-			Serial.println(buffer);
+			sprintf(Serial.buffer," P:%d k1:%d",periodo, motorStatus);
+			Serial.println(Serial.buffer);
 
 			switch (stateMode)
 			{
 				case 0:
-					strcpy(buffer," Modo:Desligado");
+					strcpy(Serial.buffer," Modo:Desligado");
 					break;
 
 				case 1:
-					sprintf(buffer," Modo:Liga Noite");
+					sprintf(Serial.buffer," Modo:Liga Noite");
 					break;
 
 				case 2:
 					if(nTM == 1)
 					{
-						sprintf(buffer," Irrig: Liga %dx as %2.d:%.2d", nTM, HourOnTM[0], MinOnTM[0]);
+						sprintf(Serial.buffer," Irrig: Liga %dx as %2.d:%.2d", nTM, HourOnTM[0], MinOnTM[0]);
 					}
 					else
 					{
-						sprintf(buffer," Irrig: Liga %dx/dia",nTM);
+						sprintf(Serial.buffer," Irrig: Liga %dx/dia",nTM);
 					}
 					break;
 
 				case 3:
 					if(nTM == 1)
 					{
-						sprintf(buffer," Valve: Liga %dx as %2.d:%.2d", nTM, HourOnTM[0], MinOnTM[0]);
+						sprintf(Serial.buffer," Valve: Liga %dx as %2.d:%.2d", nTM, HourOnTM[0], MinOnTM[0]);
 					}
 					else
 					{
-						sprintf(buffer," Valve: Liga %dx/dia",nTM);
+						sprintf(Serial.buffer," Valve: Liga %dx/dia",nTM);
 					}
 					break;
 
 				case 4:
-					sprintf(buffer," Modo: Auto HL");
+					sprintf(Serial.buffer," Modo: Auto HL");
 					break;
 
 				case 5:
 					if(nTM == 1)
 					{
-						sprintf(buffer," IrrigLow: Liga %dx as %2.d:%.2d", nTM, HourOnTM[0], MinOnTM[0]);
+						sprintf(Serial.buffer," IrrigLow: Liga %dx as %2.d:%.2d", nTM, HourOnTM[0], MinOnTM[0]);
 					}
 					else
 					{
-						sprintf(buffer," IrrigLow: Liga %dx/dia",nTM);
+						sprintf(Serial.buffer," IrrigLow: Liga %dx/dia",nTM);
 					}
 					break;
 					break;
 
 
 				default:
-					strcpy(buffer,"sMode Err");
+					strcpy(Serial.buffer,"sMode Err");
 					break;
 			}
-			Serial.println(buffer);
+			Serial.println(Serial.buffer);
 			break;
 
 		case 1:
@@ -866,14 +867,14 @@ void ACIONNA::summary_Print(uint8_t opt)
 			{
 				for(i=(nLog-1);i>=0;i--)
 				{
-					memset(buffer,0,sizeof(buffer));
-					sprintf(buffer,"OFF_%.2d: %.2d:%.2d, %.2d/%.2d ",(i+1),hourLog_OFF[i], minuteLog_OFF[i], dayLog_OFF[i], monthLog_OFF[i]);
-					Serial.println(buffer);
+					memset(Serial.buffer,0,sizeof(Serial.buffer));
+					sprintf(Serial.buffer,"OFF_%.2d: %.2d:%.2d, %.2d/%.2d ",(i+1),hourLog_OFF[i], minuteLog_OFF[i], dayLog_OFF[i], monthLog_OFF[i]);
+					Serial.println(Serial.buffer);
 					_delay_ms(20);
 
-					memset(buffer,0,sizeof(buffer));
-					sprintf(buffer,"ON__%.2d: %.2d:%.2d, %.2d/%.2d ",(i+1),hourLog_ON[i], minuteLog_ON[i], dayLog_ON[i], monthLog_ON[i]);
-					Serial.println(buffer);
+					memset(Serial.buffer,0,sizeof(Serial.buffer));
+					sprintf(Serial.buffer,"ON__%.2d: %.2d:%.2d, %.2d/%.2d ",(i+1),hourLog_ON[i], minuteLog_ON[i], dayLog_ON[i], monthLog_ON[i]);
+					Serial.println(Serial.buffer);
 					_delay_ms(20);
 				}
 			}
@@ -881,96 +882,96 @@ void ACIONNA::summary_Print(uint8_t opt)
 			{
 				for(i=(nLog-1);i>=0;i--) //	for(i=0;i<nLog;i++)
 				{
-					memset(buffer,0,sizeof(buffer));
-					sprintf(buffer,"ON__%.2d: %.2d:%.2d, %.2d/%.2d " ,(i+1),hourLog_ON[i], minuteLog_ON[i], dayLog_ON[i], monthLog_ON[i]);
-					Serial.println(buffer);
+					memset(Serial.buffer,0,sizeof(Serial.buffer));
+					sprintf(Serial.buffer,"ON__%.2d: %.2d:%.2d, %.2d/%.2d " ,(i+1),hourLog_ON[i], minuteLog_ON[i], dayLog_ON[i], monthLog_ON[i]);
+					Serial.println(Serial.buffer);
 					_delay_ms(20);
 
-					memset(buffer,0,sizeof(buffer));
-					sprintf(buffer,"OFF_%.2d: %.2d:%.2d, %.2d/%.2d ",(i+1),hourLog_OFF[i], minuteLog_OFF[i], dayLog_OFF[i], monthLog_OFF[i]);
-					Serial.println(buffer);
+					memset(Serial.buffer,0,sizeof(Serial.buffer));
+					sprintf(Serial.buffer,"OFF_%.2d: %.2d:%.2d, %.2d/%.2d ",(i+1),hourLog_OFF[i], minuteLog_OFF[i], dayLog_OFF[i], monthLog_OFF[i]);
+					Serial.println(Serial.buffer);
 					_delay_ms(20);
 				}
 			}
-			sprintf(buffer,"r0:%d, r1:%d ",reasonV[0], reasonV[1]);
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"r0:%d, r1:%d ",reasonV[0], reasonV[1]);
+			Serial.println(Serial.buffer);
 			break;
 
 		case 2:
-			sprintf(buffer,"f:%d t1:%.2d:%.2d c%dmin t2:%.2d:%.2d s:%dmin ", flag_waitPowerOn, waitPowerOn_min, waitPowerOn_sec, waitPowerOn_min_standBy, timeOn_min, timeOn_sec, motorTimerE);
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"f:%d t1:%.2d:%.2d c%dmin t2:%.2d:%.2d s:%dmin ", flag_waitPowerOn, waitPowerOn_min, waitPowerOn_sec, waitPowerOn_min_standBy, timeOn_min, timeOn_sec, motorTimerE);
+			Serial.println(Serial.buffer);
 			break;
 
 		case 3:
-			sprintf(buffer,"Motor:%d Fth:%d Rth:%d Pr:%d ", motorStatus, flag_Th, readPin_Rth(), PRess);
-			Serial.print(buffer);
+			sprintf(Serial.buffer,"Motor:%d Fth:%d Rth:%d Pr:%d ", motorStatus, flag_Th, readPin_Rth(), PRess);
+			Serial.print(Serial.buffer);
 			switch (stateMode)
 			{
 				case 3:
-					sprintf(buffer,"Pref:%d ", PRessureRef_Valve);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Pref:%d ", PRessureRef_Valve);
+					Serial.println(Serial.buffer);
 					break;
 
 				case 5:
-					sprintf(buffer,"Pref:%d, Pper:%d ", PRessureRef, PRessurePer);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Pref:%d, Pper:%d ", PRessureRef, PRessurePer);
+					Serial.println(Serial.buffer);
 					break;
 
 				default:
-					sprintf(buffer,"Pref:%d ", PRessureRef);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Pref:%d ", PRessureRef);
+					Serial.println(Serial.buffer);
 					break;
 
 			}
 			break;
 
 		case 4:
-			sprintf(buffer,"LL:%d ML:%d HL:%d ",levelSensorLL, levelSensorML, levelSensorHL);
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"LL:%d ML:%d HL:%d ",levelSensorLL, levelSensorML, levelSensorHL);
+			Serial.println(Serial.buffer);
 
-			sprintf(buffer,"LL:%d ML:%d HL:%d",levelSensorLL_d, levelSensorML_d, levelSensorHL_d);
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"LL:%d ML:%d HL:%d",levelSensorLL_d, levelSensorML_d, levelSensorHL_d);
+			Serial.println(Serial.buffer);
 			break;
 
 		case 5:
 			for(i=0;i<nTM;i++)
 			{
-				sprintf(buffer,"h%d: %.2d:%.2d",i+1, HourOnTM[i], MinOnTM[i]);
-				Serial.println(buffer);
+				sprintf(Serial.buffer,"h%d: %.2d:%.2d",i+1, HourOnTM[i], MinOnTM[i]);
+				Serial.println(Serial.buffer);
 			}
 			break;
 
 		case 6:
-			sprintf(buffer,"tON:%.2d:%.2d ",timeOn_min, timeOn_sec);
-			Serial.println(buffer);
-			sprintf(buffer,"tOFF:%.2d:%.2d",timeOff_min, timeOff_sec);
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"tON:%.2d:%.2d ",timeOn_min, timeOn_sec);
+			Serial.println(Serial.buffer);
+			sprintf(Serial.buffer,"tOFF:%.2d:%.2d",timeOff_min, timeOff_sec);
+			Serial.println(Serial.buffer);
 			break;
 
 		case 7:
-			sprintf(buffer,"P:%d Fth:%d Rth:%d Ftm:%d k1:%d k3:%d", PRess, flag_Th, readPin_Rth(), flag_timeMatch, motorStatus, readPin_k3());
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"P:%d Fth:%d Rth:%d Ftm:%d k1:%d k3:%d", PRess, flag_Th, readPin_Rth(), flag_timeMatch, motorStatus, readPin_k3());
+			Serial.println(Serial.buffer);
 
-			sprintf(buffer,"LL:%d ML:%d HL:%d  ",levelSensorLL, levelSensorML, levelSensorHL);
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"LL:%d ML:%d HL:%d  ",levelSensorLL, levelSensorML, levelSensorHL);
+			Serial.println(Serial.buffer);
 
-			sprintf(buffer,"LL:%d ML:%d HL:%d  ",levelSensorLL_d, levelSensorML_d, levelSensorHL_d);
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"LL:%d ML:%d HL:%d  ",levelSensorLL_d, levelSensorML_d, levelSensorHL_d);
+			Serial.println(Serial.buffer);
 			break;
 
 		case 8:
-//			sprintf(buffer,"WDRF:%d BORF:%d EXTRF:%d PORF:%d", flag_WDRF, flag_BORF, flag_EXTRF, flag_PORF);
-//			Serial.println(buffer);
+//			sprintf(Serial.buffer,"WDRF:%d BORF:%d EXTRF:%d PORF:%d", flag_WDRF, flag_BORF, flag_EXTRF, flag_PORF);
+//			Serial.println(Serial.buffer);
 			break;
 
 		case 9:
-			sprintf(buffer,"Err");
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"Err");
+			Serial.println(Serial.buffer);
 			break;
 
 		default:
-			sprintf(buffer,"not implemented");
-			Serial.println(buffer);
+			sprintf(Serial.buffer,"not implemented");
+			Serial.println(Serial.buffer);
 			break;
 	}
 }
@@ -1044,17 +1045,19 @@ void ACIONNA::refreshVariables()
 	if (flag_1s)
 	{
 		flag_1s = 0;
+//		gateToggle(1);
+
 		RTC_update1();
 //		RTC.read(tm);
 
 		check_gpio();			// Check drive status pin;
 		check_period();			// Period verify;
 		check_timeMatch();		// time matches flag;
-//		check_TimerVar();		// drive timers
+		check_TimerVar();		// drive timers
 
 //		check_pressure();		// get and check pressure system;
 //		check_thermalSafe();	// thermal relay check;
-//		check_levelSensors();	// level sensors;
+		check_levelSensors();	// level sensors;
 
 //		check_pressureDown();
 
@@ -1066,34 +1069,55 @@ void ACIONNA::refreshVariables()
 }
 void ACIONNA::refreshStoredData()
 {
-//	stateMode = eeprom.read(eeprom.addr_stateMode);	//eeprom_read_byte((uint8_t *)(addr_stateMode));
-//
-////	waitPowerOn_min_standBy = //eeprom_read_byte((uint8_t *)(addr_standBy_min));
-////	waitPowerOn_min = waitPowerOn_min_standBy;
-////
-////	uint8_t lbyte, hbyte;
-//////	hbyte = eeprom_read_byte((uint8_t *)(addr_LevelRef+1));
-//////	lbyte = eeprom_read_byte((uint8_t *)(addr_LevelRef));
-////	levelRef_10bit = ((hbyte << 8) | lbyte);
-////
-//////	hbyte = eeprom_read_byte((uint8_t *)(addr_motorTimerE+1));
-//////	lbyte = eeprom_read_byte((uint8_t *)(addr_motorTimerE));
-////	motorTimerE = ((hbyte << 8) | lbyte);
-//
-////	PRessureRef = //eeprom_read_byte((uint8_t *)(addr_PRessureRef));
-////	PRessureRef_Valve = //eeprom_read_byte((uint8_t *)(addr_PRessureRef_Valve));
-////	PRessurePer = //eeprom_read_byte((uint8_t *)(addr_PREssurePer));
-////	PRessureMax_Sensor = //eeprom_read_byte((uint8_t *)(addr_PRessureMax_Sensor));
-////
-//	nTM = eeprom.read(eeprom.addr_nTM); //eeprom_read_byte((uint8_t *)(addr_nTM));
-//
-//	int i;
-//	for(i=0;i<9;i++)
-//	{
-//		HourOnTM[i] = eeprom.read(eeprom.addr_HourOnTM+i); //eeprom_read_byte((uint8_t *)(addr_HourOnTM+i));
-//		MinOnTM[i] = eeprom.read(eeprom.addr_MinOnTM+i);//eeprom_read_byte((uint8_t *)(addr_MinOnTM+i));
-//	}
+	stateMode = eeprom.read(eeprom.pageSet, eeprom.addr_stateMode);	//eeprom_read_byte((uint8_t *)(addr_stateMode));
 
+	if(stateMode == 0xFF)
+	{
+		stateMode = 0;
+		eeprom.write(eeprom.pageSet, eeprom.addr_stateMode, stateMode);
+		eeprom.write(eeprom.pageSet, eeprom.addr_standBy_min, 0);
+		eeprom.write(eeprom.pageSet, eeprom.addr_LevelRef, 1023);
+		eeprom.write(eeprom.pageSet, eeprom.addr_motorTimerE, 60);
+		eeprom.write(eeprom.pageSet, eeprom.addr_PRessureRef, 60);
+		eeprom.write(eeprom.pageSet, eeprom.addr_PRessureRef_Valve, 40);
+		eeprom.write(eeprom.pageSet, eeprom.addr_PRessurePer, 85);
+		eeprom.write(eeprom.pageSet, eeprom.addr_nTM, 1);
+		eeprom.write(eeprom.pageSet, eeprom.addr_HourOnTM, 21);
+		eeprom.write(eeprom.pageSet, eeprom.addr_MinOnTM, 40);
+		eeprom.write(eeprom.pageSet, eeprom.addr_rtc_PRL, 40500);
+
+		Serial.println("default values");
+	}
+
+	rtc.rtc_PRL = eeprom.read(eeprom.pageSet, eeprom.addr_rtc_PRL);
+
+	waitPowerOn_min_standBy = eeprom.read(eeprom.pageSet, eeprom.addr_standBy_min); //eeprom_read_byte((uint8_t *)(addr_standBy_min));
+	waitPowerOn_min = waitPowerOn_min_standBy;		// reset timer
+
+//	uint8_t lbyte, hbyte;
+//	hbyte = eeprom_read_byte((uint8_t *)(addr_LevelRef+1));
+//	lbyte = eeprom_read_byte((uint8_t *)(addr_LevelRef));
+//	levelRef_10bit = ((hbyte << 8) | lbyte);
+	levelRef_10bit = eeprom.read(eeprom.pageSet, eeprom.addr_LevelRef);
+
+//	hbyte = eeprom_read_byte((uint8_t *)(addr_motorTimerE+1));
+//	lbyte = eeprom_read_byte((uint8_t *)(addr_motorTimerE));
+//	motorTimerE = ((hbyte << 8) | lbyte);
+	motorTimerE = eeprom.read(eeprom.pageSet, eeprom.addr_motorTimerE);
+
+	PRessureRef = eeprom.read(eeprom.pageSet, eeprom.addr_PRessureRef); //eeprom_read_byte((uint8_t *)(addr_PRessureRef));
+	PRessureRef_Valve = eeprom.read(eeprom.pageSet, eeprom.addr_PRessureRef_Valve); //eeprom_read_byte((uint8_t *)(addr_PRessureRef_Valve));
+	PRessurePer = eeprom.read(eeprom.pageSet, eeprom.addr_PRessurePer); //eeprom_read_byte((uint8_t *)(addr_PREssurePer));
+	PRessureMax_Sensor = eeprom.read(eeprom.pageSet, eeprom.addr_PRessureMax_Sensor); //eeprom_read_byte((uint8_t *)(addr_PRessureMax_Sensor));
+
+	nTM = eeprom.read(eeprom.pageSet, eeprom.addr_nTM); //eeprom_read_byte((uint8_t *)(addr_nTM));
+
+	int i;
+	for(i=0;i<9;i++)
+	{
+		HourOnTM[i] = eeprom.read(eeprom.pageSet, eeprom.addr_HourOnTM+i); //eeprom_read_byte((uint8_t *)(addr_HourOnTM+i));
+		MinOnTM[i] = eeprom.read(eeprom.pageSet, eeprom.addr_MinOnTM+i);//eeprom_read_byte((uint8_t *)(addr_MinOnTM+i));
+	}
 }
 void ACIONNA::handleMessage()
 {
@@ -1210,6 +1234,7 @@ $6X;				- Modos de funcionamento;
 								aux[2] = '\0';
 								waitPowerOn_min_standBy = (uint8_t) atoi(aux);
 
+								eeprom.write(eeprom.pageSet, eeprom.addr_standBy_min, waitPowerOn_min_standBy);
 								//eeprom_write_byte((uint8_t *)(addr_standBy_min), waitPowerOn_min_standBy);
 
 //								Serial.print("powerOn min:");
@@ -1225,12 +1250,14 @@ $6X;				- Modos de funcionamento;
 							aux2[4] = '\0';
 							motorTimerE = (uint16_t) atoi(aux2);
 
-							uint8_t lbyteRef = 0, hbyteRef = 0;
-							lbyteRef = motorTimerE;
-							hbyteRef = (motorTimerE >> 8);
+							eeprom.write(eeprom.pageSet, eeprom.addr_motorTimerE, motorTimerE);
 
-							//eeprom_write_byte((uint8_t *)(addr_motorTimerE+1), hbyteRef);
-							//eeprom_write_byte((uint8_t *)(addr_motorTimerE), lbyteRef);
+//							uint8_t lbyteRef = 0, hbyteRef = 0;
+//							lbyteRef = motorTimerE;
+//							hbyteRef = (motorTimerE >> 8);
+
+//							eeprom_write_byte((uint8_t *)(addr_motorTimerE+1), hbyteRef);
+//							eeprom_write_byte((uint8_t *)(addr_motorTimerE), lbyteRef);
 						}
 						summary_Print(statusCommand);
 					}
@@ -1243,10 +1270,11 @@ $6X;				- Modos de funcionamento;
 							aux[1] = sInstr[6];
 							aux[2] = '\0';
 							PRessureRef = (uint8_t) atoi(aux);
+							eeprom.write(eeprom.pageSet, eeprom.addr_PRessureRef, PRessureRef);
 							//eeprom_write_byte((uint8_t *)(addr_PRessureRef), PRessureRef);
 
-							sprintf(buffer,"PRessRef: %d", PRessureRef);
-							Serial.println(buffer);
+							sprintf(Serial.buffer,"PRessRef: %d", PRessureRef);
+							Serial.println(Serial.buffer);
 						}
 						else if(sInstr[2]==':' && sInstr[3] == 'v' && sInstr[4] == ':' && sInstr[7] == ';')
 						{
@@ -1254,10 +1282,11 @@ $6X;				- Modos de funcionamento;
 							aux[1] = sInstr[6];
 							aux[2] = '\0';
 							PRessureRef_Valve = (uint8_t) atoi(aux);
+							eeprom.write(eeprom.pageSet, eeprom.addr_PRessureRef_Valve, PRessureRef_Valve);
 							//eeprom_write_byte((uint8_t *)(addr_PRessureRef_Valve), PRessureRef_Valve);
 
-							sprintf(buffer,"PRessRef_Valve: %d", PRessureRef_Valve);
-							Serial.println(buffer);
+							sprintf(Serial.buffer,"PRessRef_Valve: %d", PRessureRef_Valve);
+							Serial.println(Serial.buffer);
 						}
 						else if(sInstr[2]==':' && sInstr[3] == 'p' && sInstr[4] == ':' && sInstr[8] == ';')
 						{// $03:p:150;
@@ -1268,7 +1297,8 @@ $6X;				- Modos de funcionamento;
 							aux2[4] = '\0';
 							PRessureMax_Sensor = (uint8_t) atoi(aux2);
 
-							//eeprom_write_byte((uint8_t *)(addr_PRessureMax_Sensor), PRessureMax_Sensor);
+							eeprom.write(eeprom.pageSet, eeprom.addr_PRessureMax_Sensor, PRessureMax_Sensor);
+//							eeprom_write_byte((uint8_t *)(addr_PRessureMax_Sensor), PRessureMax_Sensor);
 						}
 						else if(sInstr[2]==':' && sInstr[3] == 'b' && sInstr[4] == ':' && sInstr[7] == ';')
 						{
@@ -1276,6 +1306,7 @@ $6X;				- Modos de funcionamento;
 							aux[1] = sInstr[6];
 							aux[2] = '\0';
 							PRessurePer = (uint8_t) atoi(aux);
+							eeprom.write(eeprom.pageSet, eeprom.addr_PRessurePer, PRessurePer);
 							//eeprom_write_byte((uint8_t *)(addr_PREssurePer), PRessurePer);
 						}
 						else
@@ -1302,16 +1333,18 @@ $6X;				- Modos de funcionamento;
 
 							levelRef_10bit = (uint16_t) atoi(aux2);
 
-							uint8_t lbyteRef = 0, hbyteRef = 0;
-							lbyteRef = levelRef_10bit;
-							hbyteRef = (levelRef_10bit >> 8);
+//							uint8_t lbyteRef = 0, hbyteRef = 0;
+//							lbyteRef = levelRef_10bit;
+//							hbyteRef = (levelRef_10bit >> 8);
+
+							eeprom.write(eeprom.pageSet, eeprom.addr_LevelRef, levelRef_10bit);
 
 							//eeprom_write_byte((uint8_t *)(addr_LevelRef+1), hbyteRef);
 							//eeprom_write_byte((uint8_t *)(addr_LevelRef), lbyteRef);
 						}
 						summary_Print(statusCommand);
-						sprintf(buffer,"Ref: %d", levelRef_10bit);
-						Serial.println(buffer);
+						sprintf(Serial.buffer,"Ref: %d", levelRef_10bit);
+						Serial.println(Serial.buffer);
 						break;
 					// ------------------------------
 					case 7:
@@ -1347,8 +1380,8 @@ $6X;				- Modos de funcionamento;
 					// ------------------------------
 					case 9:
 						Serial.println("Rebooting...");
+						NVIC_SystemReset();
 						//wdt_enable(WDTO_15MS);
-						_delay_ms(100);
 //						flag_reset = 1;
 						break;
 
@@ -1359,7 +1392,7 @@ $6X;				- Modos de funcionamento;
 			}
 			break;
 // -----------------------------------------------------------------
-			case 1: // Setup calendar
+			case 1: 	// Setup calendar
 			{
 				// Set-up clock -> $1:h:HHMMSS;
 				if(sInstr[1]==':' && sInstr[2]=='h' && sInstr[3]==':' && sInstr[10]==';')
@@ -1410,6 +1443,31 @@ $6X;				- Modos de funcionamento;
 
 					summary_Print(0);
 
+				}
+				else if(sInstr[1]==':' && sInstr[2]=='c' && sInstr[3]==':' && sInstr[9]==';')
+				{
+					char aux3[6];
+					aux3[0] = sInstr[4];
+					aux3[1] = sInstr[5];
+					aux3[2] = sInstr[6];
+					aux3[3] = sInstr[7];
+					aux3[4] = sInstr[8];
+					aux3[5] = '\0';
+					rtc.rtc_PRL = (uint32_t) atoi(aux3);
+
+					rtc.setRTC_DIV(rtc.rtc_PRL);
+					sprintf(Serial.buffer,"PRLw: %ld", rtc.rtc_PRL);
+					Serial.println(Serial.buffer);
+
+					eeprom.write(eeprom.pageSet, eeprom.addr_rtc_PRL, (uint16_t) rtc.rtc_PRL);
+
+					sprintf(Serial.buffer,"PRLr: %ld", rtc.getRTC_DIV());
+					Serial.println(Serial.buffer);
+				}
+				else if(sInstr[1]==':' && sInstr[2]=='c' && sInstr[3]==';')
+				{
+					sprintf(Serial.buffer,"PRLreg: %lu, PRLflash: %u", rtc.getRTC_DIV(), eeprom.read(eeprom.pageSet, eeprom.addr_rtc_PRL));
+					Serial.println(Serial.buffer);
 				}
 			}
 			break;
@@ -1481,14 +1539,14 @@ $6X;				- Modos de funcionamento;
 					aux[2] = '\0';
 					uint8_t addrt = (uint8_t) atoi(aux);
 					uint8_t var = eeprom.read(eeprom.pageSet, addrt);
-					sprintf(buffer,"EE read: %d ", var);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"EE read: %d ", var);
+					Serial.println(Serial.buffer);
 
-					sprintf(buffer,"Page %d ", eeprom.pageSet);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Page %d ", eeprom.pageSet);
+					Serial.println(Serial.buffer);
 
-					sprintf(buffer,"Address %X ", eeprom.pageAddress(eeprom.pageSet));
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Address %X ", (unsigned int) eeprom.pageAddress(eeprom.pageSet));
+					Serial.println(Serial.buffer);
 				}
 				if(sInstr[1]==':' && sInstr[2]=='w' && sInstr[3]==':' && sInstr[6]==':' && sInstr[9]==';')
 				{	// $4:w:03:07;
@@ -1504,18 +1562,18 @@ $6X;				- Modos de funcionamento;
 					uint8_t var = (uint8_t) atoi(aux);
 
 					eeprom.write(eeprom.pageSet, addrt, var);
-					sprintf(buffer,"EE write: %d ", var);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"EE write: %d ", var);
+					Serial.println(Serial.buffer);
 
 					var = eeprom.read(eeprom.pageSet, addrt);
-					sprintf(buffer,"EE read2: %d ", var);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"EE read2: %d ", var);
+					Serial.println(Serial.buffer);
 
-					sprintf(buffer,"Page %d ", eeprom.pageSet);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Page %d ", eeprom.pageSet);
+					Serial.println(Serial.buffer);
 
-					sprintf(buffer,"Address %X ", eeprom.pageAddress(eeprom.pageSet));
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Address %X ", (unsigned int) eeprom.pageAddress(eeprom.pageSet));
+					Serial.println(Serial.buffer);
 				}
 				if(sInstr[1]==':' && sInstr[2]=='f' && sInstr[3]==':' && sInstr[6]==':' && sInstr[9]==';')
 				{	// $4:f:64:07;	fill page 64 with 07 value;
@@ -1533,11 +1591,11 @@ $6X;				- Modos de funcionamento;
 
 
 					eeprom.writePage(page, (var << 8 | var));
-					sprintf(buffer,"Filled page %d ", page);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Filled page %d ", page);
+					Serial.println(Serial.buffer);
 
-					sprintf(buffer,"Address %X ", eeprom.pageAddress(page));
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Address %X ", (unsigned int) eeprom.pageAddress(page));
+					Serial.println(Serial.buffer);
 				}
 				if(sInstr[1]==':' && sInstr[2]=='e' && sInstr[3]==':' && sInstr[6]==';')
 				{	// $4:e:64;	erase page 64
@@ -1548,16 +1606,16 @@ $6X;				- Modos de funcionamento;
 					uint8_t page = (uint8_t) atoi(aux);
 
 					eeprom.erasePage(page);
-					sprintf(buffer,":Page %d erased!", page);
-					Serial.println(buffer);
+					sprintf(Serial.buffer,":Page %d erased!", page);
+					Serial.println(Serial.buffer);
 
-					sprintf(buffer,"Address %X ", eeprom.pageAddress(page));
-					Serial.println(buffer);
+					sprintf(Serial.buffer,"Address %X ", (unsigned int) eeprom.pageAddress(page));
+					Serial.println(Serial.buffer);
 				}
 				break;
 			}
 // -----------------------------------------------------------------
-			case 5: // Command is $5:h1:2130;
+			case 5: 	// Command is $5:h1:2130;
 			{
 				if(sInstr[1]==':' && sInstr[2]=='h' && sInstr[4]==':' && sInstr[9]==';')
 				{
@@ -1570,14 +1628,14 @@ $6X;				- Modos de funcionamento;
 					aux[1] = sInstr[6];
 					aux[2] = '\0';
 					HourOnTM[indexV-1] = (uint8_t) atoi(aux);
-//					eeprom.write(eeprom.addr_HourOnTM+indexV-1, HourOnTM[indexV-1]);
+					eeprom.write(eeprom.pageSet, eeprom.addr_HourOnTM+indexV-1, HourOnTM[indexV-1]);
 					//eeprom_write_byte(( uint8_t *)(addr_HourOnTM+indexV-1), HourOnTM[indexV-1]);
 
 					aux[0] = sInstr[7];
 					aux[1] = sInstr[8];
 					aux[2] = '\0';
 					MinOnTM[indexV-1] = (uint8_t) atoi(aux);
-//					eeprom.write(eeprom.addr_MinOnTM+indexV-1, MinOnTM[indexV-1]);
+					eeprom.write(eeprom.pageSet, eeprom.addr_MinOnTM+indexV-1, MinOnTM[indexV-1]);
 //					eeprom_write_byte(( uint8_t *)(addr_MinOnTM+indexV-1), MinOnTM[indexV-1]);
 
 					summary_Print(5);
@@ -1589,7 +1647,7 @@ $6X;				- Modos de funcionamento;
 					aux[2] = '\0';
 
 					nTM = (uint8_t) atoi(aux);
-//					eeprom.write(eeprom.addr_nTM, nTM);
+					eeprom.write(eeprom.pageSet, eeprom.addr_nTM, nTM);
 					//eeprom_write_byte(( uint8_t *)(addr_nTM), nTM);
 
 					summary_Print(5);
@@ -1607,16 +1665,76 @@ $6X;				- Modos de funcionamento;
 				aux[1] = sInstr[1];
 				aux[2] = '\0';
 				stateMode = (uint8_t) atoi(aux);
-//				eeprom.write(eeprom.addr_stateMode, stateMode);
+				eeprom.write(eeprom.pageSet, eeprom.addr_stateMode, stateMode);
 //				//eeprom_write_byte(( uint8_t *)(addr_stateMode), stateMode);
 
 				summary_Print(0);
 			}
 			break;
 // -----------------------------------------------------------------
+			case 7:		// nRF24L01p test functions;
+			{
+				// $7:s:
+				uint8_t state =9;
+				if(sInstr[1]==':' && sInstr[2]=='s' && sInstr[3]==';')
+				{
+					radio.begin_nRF24L01p();
+				}
+				else if(sInstr[1]==':' && sInstr[2]=='g' && sInstr[3]==';')
+				{
+					state = radio.get_stateMode();
+				}
+				else if(sInstr[1]==':' && sInstr[2]=='t' && sInstr[3]==';')
+				{
+					state = radio.set_mode_tx(ENABLE);
+				}
+				else if(sInstr[1]==':' && sInstr[2]=='r' && sInstr[3]==';')
+				{
+					state = radio.set_mode_rx(ENABLE);
+				}
+				else if(sInstr[1]==':' && sInstr[2]=='b' && sInstr[3]==';')
+				{
+					state = radio.set_mode_standbyI();
+				}
+				else if(sInstr[1]==':' && sInstr[2]=='p' && sInstr[3]==';')
+				{
+					state = radio.set_mode_powerDown();
+				}
+
+				sprintf(Serial.buffer,"state: %u", state);
+				Serial.println(Serial.buffer);
+
+//				radio.begin_nRF24L01p();
+//				radio.set_250kbps();
+//				if(sInstr[1]==':' && sInstr[2]=='h' && sInstr[4]==':' && sInstr[9]==';')
+//				{
+//					aux[0] = '0';
+//					aux[1] = sInstr[3];
+//					aux[2] = '\0';
+//					uint8_t indexV = (uint8_t) atoi(aux);
+//
+//					aux[0] = sInstr[5];
+//					aux[1] = sInstr[6];
+//					aux[2] = '\0';
+//					HourOnTM[indexV-1] = (uint8_t) atoi(aux);
+//					eeprom.write(eeprom.pageSet, eeprom.addr_HourOnTM+indexV-1, HourOnTM[indexV-1]);
+//					//eeprom_write_byte(( uint8_t *)(addr_HourOnTM+indexV-1), HourOnTM[indexV-1]);
+//
+//					aux[0] = sInstr[7];
+//					aux[1] = sInstr[8];
+//					aux[2] = '\0';
+//					MinOnTM[indexV-1] = (uint8_t) atoi(aux);
+//					eeprom.write(eeprom.pageSet, eeprom.addr_MinOnTM+indexV-1, MinOnTM[indexV-1]);
+////					eeprom_write_byte(( uint8_t *)(addr_MinOnTM+indexV-1), MinOnTM[indexV-1]);
+//
+//					summary_Print(5);
+			}
+			break;
+// -----------------------------------------------------------------
 			default:
 				summary_Print(10);
 				break;
+// -----------------------------------------------------------------
 		}
 		memset(sInstr,0,sizeof(sInstr));	// Clear all vector;
 	}
@@ -1639,8 +1757,8 @@ void ACIONNA::comm_Bluetooth()
 		if(flag_frameStartBT)
 			sInstrBluetooth[j2] = inChar;
 
-//		sprintf(buffer,"J= %d",j2);
-//		Serial.println(buffer);
+//		sprintf(Serial.buffer,"J= %d",j2);
+//		Serial.println(Serial.buffer);
 
 		j2++;
 
@@ -1702,8 +1820,5 @@ void ACIONNA::comm_Bluetooth()
 
 
 #endif /* HARDWARE_H_ */
-
-
-
 
 #endif /* ACIONNA_H_ */
