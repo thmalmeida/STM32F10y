@@ -67,6 +67,7 @@ enum states01 {
 };
 enum states01 periodo = redTime;
 
+SPI SerialSPI;
 USART Serial;
 EEPROM 	eeprom;
 nRF24L01p radio;
@@ -141,10 +142,10 @@ public:
 	void DefIn__read_k1();
 	void DefIn__read_k3();
 
-	bool readPin_k1_PIN();
-	bool readPin_k1();
-	bool readPin_Rth();
-	bool readPin_k3();
+	uint8_t readPin_k1_PIN();
+	uint8_t readPin_k1();
+	uint8_t readPin_Rth();
+	uint8_t readPin_k3();
 
 	void motor_start();
 	void motor_stop(uint8_t reason);
@@ -207,6 +208,7 @@ private:
 void ACIONNA::begin_acn()
 {
 	gateConfig(pin_out_led, 1);		// Configure pin led as output;
+	drive_led_off();
 	gateConfig(pin_out_k1, 1);
 	gateConfig(pin_out_k2, 1);
 	gateConfig(pin_out_k3, 1);
@@ -221,29 +223,29 @@ void ACIONNA::begin_acn()
 
 	rtc.begin_rtc(0, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
 }
-bool ACIONNA::readPin_Rth()
+uint8_t ACIONNA::readPin_Rth()
 {
-	return gateRead(pin_in_Rth);
+	return gateRead(pin_in_Rth, 0);
 }
-bool ACIONNA::readPin_k1()
+uint8_t ACIONNA::readPin_k1()
 {
-	return 	gateRead(pin_in_k1);
+	return 	gateRead(pin_out_k1, 0);
 }
-bool ACIONNA::readPin_k1_PIN()
+uint8_t ACIONNA::readPin_k1_PIN()
 {
-	return gateRead(pin_in_k1);
+	return gateRead(pin_out_k1, 1);
 }
-bool ACIONNA::readPin_k3()
+uint8_t ACIONNA::readPin_k3()
 {
-	return gateRead(pin_in_k3);
+	return gateRead(pin_in_k3, 1);
 }
 void ACIONNA::drive_led_on()
 {
-	gateSet(pin_out_led, 1);
+	gateSet(pin_out_led, 0);
 }
 void ACIONNA::drive_led_off()
 {
-	gateSet(pin_out_led, 0);
+	gateSet(pin_out_led, 1);
 }
 void ACIONNA::drive_led_toggle()
 {
@@ -311,8 +313,8 @@ void ACIONNA::motor_stop(uint8_t reason)
 //	_delay_ms(1);
 
 	motorStatus = readPin_k1_PIN();
-//	sprintf(Serial.buffer,"offR:%d", reason);
-//	Serial.println(Serial.buffer);
+	sprintf(Serial.buffer,"offR:%d", reason);
+	Serial.println(Serial.buffer);
 }
 void ACIONNA::motor_start()
 {

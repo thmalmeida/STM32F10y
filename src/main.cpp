@@ -8,7 +8,6 @@
 #include <stm32f10x_rtc.h>
 #include "stm32f10x_it.h"
 
-SPI SerialSPI;
 ACIONNA acn;
 
 // Wake up interrupts
@@ -16,6 +15,8 @@ ACIONNA acn;
 //uint8_t flag_BORF = 0;			// Brown-out Reset Flag
 //uint8_t flag_EXTRF = 0;			// External Reset Flag
 //uint8_t flag_PORF = 0;			// Power-on Reset Flag
+
+uint16_t var = 0x0003;
 
 int main(void)
 {
