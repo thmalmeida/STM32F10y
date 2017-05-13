@@ -28,6 +28,7 @@ public:
 	time_t uptime32 = 0;
 
 	uint32_t rtc_PRL;
+	uint8_t  rtc_clkSource;
 
 	char _buffer[50];
 
@@ -77,6 +78,7 @@ void RTCi::begin_rtc(uint8_t clockSource, uint32_t rtc_PRL)
 		break;
 
 		case 2:
+			RCC->BDCR |= RCC_BDCR_RTCSEL_0;
 			RCC->BDCR |= RCC_BDCR_RTCSEL_LSE;			// select external low speed oscillator clock source;
 			RCC->BDCR |= RCC_BDCR_LSEON;				// External Low Speed oscillator enable;
 			while((RCC->BDCR & RCC_BDCR_LSERDY) == 0);	// Wait until external oscillator is established

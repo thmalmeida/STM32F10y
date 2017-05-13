@@ -54,6 +54,7 @@ public:
 	const uint8_t addr_motorTimerStart2 	= 67;		// 2 bytes
 	const uint8_t addr_PRessurePer 			= 69;		// 1 byte
 	const uint8_t addr_rtc_PRL				= 80; 		// 2 bytes
+	const uint8_t addr_rtc_clkSource		= 82;		// 1 byte
 
 	void begin_eeprom(void);
 	void end_eeprom(void);

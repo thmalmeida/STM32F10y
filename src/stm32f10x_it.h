@@ -62,7 +62,7 @@ void TIM_Init(void);
 void IO_Init(void);
 void RCC_Init();
 void ADC1_Init();
-int ADC_Read(uint8_t channel);
+//int ADC_Read(uint8_t channel);
 void LED_green(uint8_t status);
 void LED_green_toogle();
 void init(void);

@@ -60,7 +60,7 @@ int ADC::adc_readChannel(uint8_t channel)
 	//clear EOC flag
 	ADC_ClearFlag(ADC1, ADC_FLAG_EOC);
 
-	return AD_value;
+	return (AD_value >> 2);
 }
 void ADC::adc_selectChannel(uint8_t channel)
 {

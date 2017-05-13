@@ -7,24 +7,45 @@
 #include <stm32f10x.h>
 #include <stm32f10x_rtc.h>
 #include "stm32f10x_it.h"
+#include "Hardware/adc.h"
 
 ACIONNA acn;
+
+ADC convert;
 
 // Wake up interrupts
 //uint8_t flag_WDRF = 0;			// Watchdog System Reset Flag
 //uint8_t flag_BORF = 0;			// Brown-out Reset Flag
 //uint8_t flag_EXTRF = 0;			// External Reset Flag
 //uint8_t flag_PORF = 0;			// Power-on Reset Flag
-
-uint16_t var = 0x0003;
+//uint16_t var = 0x0003;
 
 int main(void)
 {
 	init();							// uC basic peripherals setup
 
-	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
 	acn.begin_acn();				// Class acionna statement
+	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
 	Serial.println("Acionna v2.0");
+	acn.blink_led(2, 150);
+
+//	acn.gateConfig(1,1);
+//	acn.gateConfig(2,1);
+//	acn.gateConfig(3,1);
+//	acn.gateConfig(32,1);
+//
+//	while(1)
+//	{
+//		acn.gateSet(32,1);
+//		acn.gateSet(3,1);
+//		acn.gateSet(2,1);
+//		acn.gateSet(1,1);
+//
+//		acn.gateSet(32,0);
+//		acn.gateSet(3,0);
+//		acn.gateSet(2,0);
+//		acn.gateSet(1,0);
+//	}
 
 	while(1)
 	{
