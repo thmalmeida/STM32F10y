@@ -64,6 +64,66 @@ void GPIO::gateConfig(uint8_t pin, uint8_t dir)
 			GPIO_Init(GPIOA, &GPIO_InitStructure);
 			break;
 
+		case 6:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
+			break;
+
+		case 7:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
+			break;
+
+		case 8:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
+			break;
+
+		case 9:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
+			break;
+
+		case 10:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
+			break;
+
+		case 11:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
+			break;
+
+		case 12:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+			GPIO_Init(GPIOB, &GPIO_InitStructure);
+			break;
+
+		case 13:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+			GPIO_Init(GPIOB, &GPIO_InitStructure);
+			break;
+
+		case 14:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+			GPIO_Init(GPIOB, &GPIO_InitStructure);
+			break;
+
+		case 15:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+			GPIO_Init(GPIOB, &GPIO_InitStructure);
+			break;
+
 		case 25:
 			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
 			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
@@ -171,6 +231,116 @@ void GPIO::gateSet(uint8_t pin, uint8_t status)
 			else
 			{
 				GPIOA -> BRR  = (1<<1);
+			}
+			break;
+
+		case 6:
+			if(status)
+			{
+				GPIOA -> BSRR = (1<<2);
+			}
+			else
+			{
+				GPIOA -> BRR  = (1<<2);
+			}
+			break;
+
+		case 7:
+			if(status)
+			{
+				GPIOA -> BSRR = (1<<3);
+			}
+			else
+			{
+				GPIOA -> BRR  = (1<<3);
+			}
+			break;
+
+		case 8:
+			if(status)
+			{
+				GPIOA -> BSRR = (1<<4);
+			}
+			else
+			{
+				GPIOA -> BRR  = (1<<4);
+			}
+			break;
+
+		case 9:		// PA5 (SPI1_SCK)
+			if(status)
+			{
+				GPIOA -> BSRR = (1<<5);
+			}
+			else
+			{
+				GPIOA -> BRR  = (1<<5);
+			}
+			break;
+
+		case 10:	// PA6
+			if(status)
+			{
+				GPIOA -> BSRR = (1<<6);
+			}
+			else
+			{
+				GPIOA -> BRR  = (1<<6);
+			}
+			break;
+
+		case 11:	// PA7
+			if(status)
+			{
+				GPIOA -> BSRR = (1<<7);
+			}
+			else
+			{
+				GPIOA -> BRR  = (1<<7);
+			}
+			break;
+
+		case 12:	// PB0
+			if(status)
+			{
+				GPIOB -> BSRR = (1<<0);
+			}
+			else
+			{
+				GPIOB -> BRR  = (1<<0);
+			}
+			break;
+
+		case 13:	// PB1
+			if(status)
+			{
+				GPIOB -> BSRR = (1<<1);
+			}
+			else
+			{
+				GPIOB -> BRR  = (1<<1);
+			}
+			break;
+
+		case 14:	// PB10
+			if(status)
+			{
+				GPIOB -> BSRR = (1<<10);
+			}
+			else
+			{
+				GPIOB -> BRR  = (1<<10);
+			}
+			break;
+
+		case 15:	// PB11
+			if(status)
+			{
+				GPIOB -> BSRR = (1<<11);
+			}
+			else
+			{
+				GPIOB -> BRR  = (1<<11);
 			}
 			break;
 
@@ -306,6 +476,20 @@ uint8_t GPIO::gateRead(uint8_t pin, uint8_t reg)	// reg: read register input IDR
 				status = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_0);
 			else
 				status = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
+			break;
+
+		case 31:
+			if(reg)
+				status = GPIO_ReadOutputDataBit(GPIOB, GPIO_Pin_8);
+			else
+				status = GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_8);
+			break;
+
+		case 32:
+			if(reg)
+				status = GPIO_ReadOutputDataBit(GPIOB, GPIO_Pin_9);
+			else
+				status = GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_9);
 			break;
 	}
 

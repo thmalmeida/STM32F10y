@@ -6,7 +6,7 @@
  */
 #include "spi.h"
 
-void SPI::set_SPI_to_Master()
+void SPI::set_SPI_to_Master(uint8_t mode)
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
@@ -23,15 +23,13 @@ void SPI::set_SPI_to_Master()
 //	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 //	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 //	GPIO_Init(SPI_PORT, &GPIO_InitStructure);
-
 //	GPIO_InitStructure.GPIO_Pin = SPI1_PIN_MISO;
 //	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 //	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 //	GPIO_Init(SPI_PORT, &GPIO_InitStructure);
-
 //	SPI1_REMAP
 //	GPIO_PinRemapConfig(GPIO_Remap_SPI1, ENABLE);
-	// or
+// or
 //	AFIO -> EVCR |= AFIO_EVCR_PORT_PA | AFIO_EVCR_PIN_PX5;
 //	AFIO -> EVCR |= AFIO_EVCR_EVOE;
 //	AFIO -> MAPR |= AFIO_MAPR_SPI1_REMAP;
@@ -40,26 +38,42 @@ void SPI::set_SPI_to_Master()
 
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
 	/* SPIy Config -------------------------------------------------------------*/
-	SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
 	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;		// Slave mode selected
 	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;	// byte size
-	SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;			// clock is low when idle
-	SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;		// data sampled at first edge
 	SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;// | SPI_NSSInternalSoft_Set;
 	SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_256;
 	SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
 	SPI_InitStructure.SPI_CRCPolynomial = 7;
+
+	switch (mode)
+	{
+		case 1:		// used on nokia5110 GLCD
+		{
+			SPI_InitStructure.SPI_Direction = SPI_Direction_1Line_Tx;
+			SPI_InitStructure.SPI_CPOL = SPI_CPOL_High;
+			SPI_InitStructure.SPI_CPHA = SPI_CPHA_2Edge;
+			break;
+		}
+
+		default:	// default mode full duplex with miso/mosi elements
+		{
+			SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+			SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;			// clock is low when idle
+			SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;		// data sampled at first edge
+			break;
+		}
+	}
+
 	SPI_Init(SPI1, &SPI_InitStructure);
 
 	SPI_NSSInternalSoftwareConfig(SPI1, SPI_NSSInternalSoft_Set);
-//	SPI_SSOutputCmd(SPI1, ENABLE);
 
+//	SPI_SSOutputCmd(SPI1, ENABLE);
 //	Interrupt ------
 //	SPI_I2S_ITConfig(SPI1, SPI_I2S_IT_RXNE, ENABLE);
 //	SPI_I2S_ITConfig(SPI1, SPI_I2S_IT_TXE, ENABLE);
 //	SPI_I2S_ITConfig(SPI1, SPI_I2S_IT_OVR, ENABLE);
 //	SPI_I2S_ITConfig(SPI1, SPI_I2S_IT_ERR, ENABLE);
-
 //	NVIC_InitTypeDef NVIC_InitStructure; // this is used to configure the NVIC (nested vector interrupt controller)
 //	NVIC_InitStructure.NVIC_IRQChannel = SPI1_IRQn;				// we want to configure the USART1 interrupts
 //	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x00;

@@ -49,9 +49,8 @@ public:
 
 	unsigned char SPI_received_string[50]; // this will hold the recieved string
 
-	void set_SPI_to_Master();
+	void set_SPI_to_Master(uint8_t mode);
 	void set_SPI_to_Slave();
-
 	void print(char const *s);
 	unsigned char transfer_Byte(uint16_t Data);
 	unsigned char writeByte(uint16_t Data);

@@ -3,15 +3,20 @@
 #include <string.h>
 
 #include "acionna.h"
+#include "loadCell.h"
 #include <time.h>
 #include <stm32f10x.h>
 #include <stm32f10x_rtc.h>
 #include "stm32f10x_it.h"
 #include "Hardware/adc.h"
 
-ACIONNA acn;
+#include "nokia5110/nokia5110.h"
 
+ACIONNA acn;
 ADC convert;
+
+LOADCELL weight;
+NOKIA5110 glcd;
 
 // Wake up interrupts
 //uint8_t flag_WDRF = 0;			// Watchdog System Reset Flag
@@ -47,15 +52,39 @@ int main(void)
 //		acn.gateSet(1,0);
 //	}
 
+	weight.begin_loadcell();
+	glcd.glcd_init();
+	glcd.glcd_example();
+
+	uint32_t value;
+	int P;
 	while(1)
 	{
-		acn.comm_Bluetooth();
+		value = weight.readInput();
 
-		acn.refreshVariables();
+//		P = weight.get_weight();
+		double a = (40.0*value)/16777216.0;
+		P = (int) (a*1000.0/4.15*10);
+		sprintf(Serial.buffer,"V= %lu, P= %d", value, P);
+		Serial.println(Serial.buffer);
+		_delay_ms(500);
 
-		acn.handleMessage();
+//		if(weigth.pin_data_get())
+//		{
+//			weigth.drive_led(1);
+//		}
+//		else
+//		{
+//			weigth.drive_led(0);
+//		}
 
-		acn.process_Mode();
+//		acn.comm_Bluetooth();
+//
+//		acn.refreshVariables();
+//
+//		acn.handleMessage();
+//
+//		acn.process_Mode();
 
 //		if(acn.flag_1s)
 //		{
