@@ -210,7 +210,7 @@ public:
 	void glcd_command(uint8_t c);
 
 	void glcd_put_char(char c);
-	void glcd_put_string(uint8_t x, uint8_t y, char *str);
+	void glcd_put_string(uint8_t x, uint8_t y, char const *str);
 	void glcd_reset();
 	void glcd_print(void);
 	void glcd_set_contrast(uint8_t val);
@@ -218,6 +218,8 @@ public:
 	void glcd_power_up(void);
 	void glcd_PCD8544_init(void);
 	void glcd_example();
+
+	void glcd_SPI1_debug();
 
 protected:
 	void LCD_ENABLE();
@@ -305,7 +307,7 @@ void NOKIA5110::RCC_Configuration(void)
 //
 ////	GPIOA ->
 //}
-//void transfer_Byte(uint8_t B)
+//void writeByte(uint8_t B)
 //{
 //	SPI_SendData8(SPI1, B);
 //}
@@ -324,7 +326,7 @@ void NOKIA5110::glcd_command(uint8_t c)
 	LCD_RESET_OFF();
 	LCD_ENABLE();
 	LCD_DC_COMMAND();
-	transfer_Byte(c);
+	writeByte(c);
 //	SPI_write(c);
 	_delay_us(PCD8544_TIME_DELAY);
 }
@@ -334,8 +336,16 @@ void NOKIA5110::glcd_data(uint8_t c)
 	LCD_ENABLE();
 	LCD_DC_DATA();
 	_delay_us(PCD8544_TIME_DELAY);
-	transfer_Byte(c);
+	writeByte(c);
 	_delay_us(PCD8544_TIME_DELAY);
+}
+void NOKIA5110::glcd_SPI1_debug()
+{
+	char c = 'A';
+	while(1)
+	{
+		writeByte(c);
+	}
 }
 void NOKIA5110::glcd_init()
 {
@@ -372,6 +382,8 @@ void NOKIA5110::glcd_init()
 
 	// Set display to Normal
 	glcd_command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYNORMAL);
+
+	glcd_clear2();
 
 //	/* Initialization sequence of controller */
 //	glcd_reset();
@@ -527,7 +539,7 @@ void NOKIA5110::glcd_put_char(char c)
 		glcd_data(FontNew[(c-32)*5+i]);
 	}
 }
-void NOKIA5110::glcd_put_string(uint8_t x, uint8_t y, char *str)
+void NOKIA5110::glcd_put_string(uint8_t x, uint8_t y, char const *str)
 {
 	glcd_set_x_address(x);
 	glcd_set_y_address(y);
@@ -538,7 +550,11 @@ void NOKIA5110::glcd_put_string(uint8_t x, uint8_t y, char *str)
 }
 void NOKIA5110::glcd_example()
 {
-	char *str1 = "STM32F-M4";
+	char *str1 = "EXAMPLE";
+//	char *str1 = {};
+//	strcpy(str1, "EXAMPLE");
+//	char str2[9];
+//	sprintf(str2,"EXAMPLE%d",0);
 	glcd_command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYNORMAL);
 	glcd_put_string(13, 3, str1);
 }

@@ -88,7 +88,7 @@ void LOADCELL::pin_data_set(uint8_t status)
 uint32_t LOADCELL::readInput()
 {
 	int i, cycles = 24;
-	uint32_t Count = 0;
+	int Count = 0;
 
 	pin_data_set(1);
 	pin_sck_set(0);
@@ -111,7 +111,6 @@ uint32_t LOADCELL::readInput()
 		}
 
 //		weigth = ((weigth << 1) | (pin_data_get()));
-
 	}
 
 	// 25 clk

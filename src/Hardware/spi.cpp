@@ -177,16 +177,10 @@ unsigned char SPI::transfer_Byte(uint16_t Data)
 
 	return Data2;
 }
-unsigned char SPI::writeByte(uint16_t Data)
+void SPI::writeByte(uint16_t Data)
 {
-	unsigned char Data2 = 0;
-	// Verify if transmit buffer is empty TXE bit
 	while(!(SPI1-> SR & SPI_I2S_FLAG_TXE) );
 	SPI1 -> DR = Data;
-//	SPI1 -> DR = (Data & (uint16_t)0x00FF);
-	while(!(SPI1-> SR & SPI_I2S_FLAG_RXNE) );
-	Data2 = SPI1 -> DR;
-	return Data2;
 }
 unsigned char SPI::readByte()
 {

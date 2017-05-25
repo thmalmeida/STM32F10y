@@ -53,7 +53,7 @@ public:
 	void set_SPI_to_Slave();
 	void print(char const *s);
 	unsigned char transfer_Byte(uint16_t Data);
-	unsigned char writeByte(uint16_t Data);
+	void writeByte(uint16_t Data);
 	unsigned char readByte();
 	int available();
 //	void master_demo01();
