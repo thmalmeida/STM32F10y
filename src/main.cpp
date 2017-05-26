@@ -62,16 +62,16 @@ int main(void)
 //		sprintf(Serial.buffer,"V= %lu, P= %d", value, P);
 
 		P = weight.get_weight();
+
 		if(P>0)
 		{
-			sprintf(Serial.buffer,"%4.d.%d g    ", (P/10), P%10);
+			sprintf(Serial.buffer,"%4.1d.%.2d g    ", (P/weight.Waccu), P%weight.Waccu);
 		}
 		else
-			sprintf(Serial.buffer,"%4.d.%d g    ", P/10, abs(P%10));
+			sprintf(Serial.buffer,"%4.1d.%.2d g    ", P/weight.Waccu, abs(P%weight.Waccu));
 
 		Serial.println(Serial.buffer);
 		glcd.glcd_put_string(10,2,Serial.buffer);
-		_delay_ms(100);
 
 //		if(weigth.pin_data_get())
 //		{

@@ -51,13 +51,19 @@ class LOADCELL : public GPIO , ADC {
 public:
 
 	int timeD = 1;
-	int offset;								// offset after tare;
-	int WeightX10;							// currently weight x10;
+	int offset = 0;					// offset after tare;
+	int WeightX10;					// currently weight x10;
 
+	static const int nWeight = 200;
+
+	int WeightVect[nWeight];
+	int signalVect[nWeight];
+
+	static const int Waccu = 100;
 	double Kc = 1.329;				// proportional constant;
-	double Vrange = 20.0;				// Small signal scale range [mV];
-	double scaleHalf = 8388607.0;		// ((2^24)/2)-1;
-	double Wmax = 1000.0;				// Sensor max weight [g];
+	double Vrange = 20.0;			// Small signal scale range [mV];
+	double scaleHalf = 8388607.0;	// ((2^24)/2)-1;
+	double Wmax = 1000.0;			// Sensor max weight [g];
 	double Vref = 4.97;				// Voltage reference [V];
 
 	void drive_led(uint8_t status);
@@ -69,32 +75,43 @@ public:
 	int get_weight();
 
 	void tareSystem();
+	void tareSystem2();
 
 private:
 };
 
-void LOADCELL::drive_led(uint8_t status)
-{
-	gateSet(1, status);
-}
 void LOADCELL::begin_loadcell()
 {
 	gateConfig(31, 1);	// sck pin
 	gateConfig(32, 0);	// data pin
 	gateConfig(1, 1);	// led
 
-	tareSystem();
+	tareSystem2();
 }
 void LOADCELL::tareSystem()
 {
-	int i, n = 30;
+	int i, n = 100;
 
 	for(i=0;i<n;i++)
 	{
 		offset += readInput();
-		_delay_ms(25);
 	}
 	offset = offset/n;
+}
+void LOADCELL::tareSystem2()
+{
+
+	while(get_weight() != 0)
+	{
+		get_weight();
+
+		int Ssum = 0;
+		for(int i=0; i< nWeight ;i++)
+		{
+			Ssum+= signalVect[i];
+		}
+		offset = Ssum/nWeight;
+	}
 }
 void LOADCELL::pin_sck_set(uint8_t status)
 {
@@ -162,11 +179,41 @@ int LOADCELL::readInput()
 }
 int LOADCELL::get_weight(void)
 {
-	double Vdig = (readInput()- offset);
+	int signal = readInput();
+	double Vdig = (signal - offset);
 	double a = (Kc*Vrange*Vdig)/scaleHalf;
-	WeightX10 = (int) 10.0*(a*Wmax/Vref);
+	int WeightTemp = (int) Waccu*(a*Wmax/Vref);
+
+	int error = WeightTemp - WeightX10;
+	if(abs(error) > 15)
+	{
+		for(int i=1; i<nWeight;i++)
+		{
+			signalVect[i] = signal;
+			WeightVect[i] = WeightTemp;
+		}
+		WeightX10 = WeightTemp;
+	}
+	else
+	{
+		int Wsum = 0;
+		for(int i=(nWeight-1);i>0;i--)
+		{
+			signalVect[i] = signalVect[i-1];
+			WeightVect[i] = WeightVect[i-1];
+			Wsum+= WeightVect[i];
+		}
+		signalVect[0] = signal;
+		WeightVect[0] = WeightTemp;
+		Wsum+= WeightVect[0];
+		WeightX10 = Wsum/nWeight;
+	}
 
 	return WeightX10;
+}
+void LOADCELL::drive_led(uint8_t status)
+{
+	gateSet(1, status);
 }
 #endif /* HARDWARE_H_ */
 
