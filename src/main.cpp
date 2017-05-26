@@ -52,30 +52,16 @@ int main(void)
 //		acn.gateSet(1,0);
 //	}
 
-	weight.begin_loadcell();
 	glcd.glcd_init();
+	weight.begin_loadcell();
 
-	int value;
 	int P;
-
-	int i;
-	int offset=0, n = 30;
-	for(i=0;i<n;i++)
-	{
-		offset += weight.readInput();
-		_delay_ms(25);
-	}
-	offset = offset/n;
 
 	while(1)
 	{
-		value = weight.readInput() - offset;
-
-//		P = weight.get_weight();
-		double a = (1.329*20.0*value)/8388607.0;
-		P = (int) 10.0*(a*1000.0/4.97);
 //		sprintf(Serial.buffer,"V= %lu, P= %d", value, P);
 
+		P = weight.get_weight();
 		if(P>0)
 		{
 			sprintf(Serial.buffer,"%4.d.%d g    ", (P/10), P%10);

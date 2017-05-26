@@ -51,14 +51,24 @@ class LOADCELL : public GPIO , ADC {
 public:
 
 	int timeD = 1;
+	int offset;								// offset after tare;
+	int WeightX10;							// currently weight x10;
+
+	double Kc = 1.329;				// proportional constant;
+	double Vrange = 20.0;				// Small signal scale range [mV];
+	double scaleHalf = 8388607.0;		// ((2^24)/2)-1;
+	double Wmax = 1000.0;				// Sensor max weight [g];
+	double Vref = 4.97;				// Voltage reference [V];
 
 	void drive_led(uint8_t status);
 	void begin_loadcell();
-	uint32_t readInput();
+	int readInput();
 	void pin_sck_set(uint8_t status);
 	void pin_data_set(uint8_t status);
 	uint32_t pin_data_get();
 	int get_weight();
+
+	void tareSystem();
 
 private:
 };
@@ -72,6 +82,19 @@ void LOADCELL::begin_loadcell()
 	gateConfig(31, 1);	// sck pin
 	gateConfig(32, 0);	// data pin
 	gateConfig(1, 1);	// led
+
+	tareSystem();
+}
+void LOADCELL::tareSystem()
+{
+	int i, n = 30;
+
+	for(i=0;i<n;i++)
+	{
+		offset += readInput();
+		_delay_ms(25);
+	}
+	offset = offset/n;
 }
 void LOADCELL::pin_sck_set(uint8_t status)
 {
@@ -85,7 +108,7 @@ void LOADCELL::pin_data_set(uint8_t status)
 {
 	gateSet(32, status);
 }
-uint32_t LOADCELL::readInput()
+int LOADCELL::readInput()
 {
 	int i, cycles = 24;
 	int Count = 0;
@@ -137,13 +160,13 @@ uint32_t LOADCELL::readInput()
 
 	return Count;
 }
-int LOADCELL::get_weight()
+int LOADCELL::get_weight(void)
 {
-	int d = readInput();
-	int a = (int) (20.0*d)/16777216.0;
-	int P = (int) a*1000.0/4.09*10;
+	double Vdig = (readInput()- offset);
+	double a = (Kc*Vrange*Vdig)/scaleHalf;
+	WeightX10 = (int) 10.0*(a*Wmax/Vref);
 
-	return P;
+	return WeightX10;
 }
 #endif /* HARDWARE_H_ */
 
