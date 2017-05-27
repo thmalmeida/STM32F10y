@@ -60,7 +60,7 @@ public:
 	int signalVect[nWeight];
 
 	static const int Waccu = 100;
-	double Kc = 1.329;				// proportional constant;
+	double Kc = 1.3295;				// proportional constant;
 	double Vrange = 20.0;			// Small signal scale range [mV];
 	double scaleHalf = 8388607.0;	// ((2^24)/2)-1;
 	double Wmax = 1000.0;			// Sensor max weight [g];

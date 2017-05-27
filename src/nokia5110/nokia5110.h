@@ -8,6 +8,11 @@
 #ifndef NOKIA5110_NOKIA5110_H_
 #define NOKIA5110_NOKIA5110_H_
 
+#include "../Hardware/spi.h"
+#include "../Hardware/gpio.h"
+#include "glcd.h"
+#include "fonts/fonts.h"
+
 static const uint8_t FontNew[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00,// (space)
 	0x00, 0x00, 0x5F, 0x00, 0x00,// !
@@ -136,7 +141,7 @@ static const uint8_t Numbers[] = {	// 23 cols
 #define BLACK 							1
 #define WHITE 							0
 
-#define LCDWIDTH						84
+#define LCDWIDTH						84	// Pixels
 #define LCDHEIGHT						48
 
 #define PCD8544_POWERDOWN				0x04
@@ -203,11 +208,6 @@ static const uint8_t Numbers[] = {	// 23 cols
 #define BufferSize 32
 #define SEND_LIMIT 3
 
-
-#include "../Hardware/spi.h"
-#include "../Hardware/gpio.h"
-#include "glcd.h"
-
 class NOKIA5110 : SPI, GPIO {
 public:
 	void RCC_Configuration();
@@ -233,6 +233,7 @@ public:
 	void glcd_power_up(void);
 	void glcd_PCD8544_init(void);
 	void glcd_example();
+	void glcd_big_str(uint8_t x, uint8_t y, char const *str);
 
 	void glcd_SPI1_debug();
 
@@ -548,15 +549,15 @@ void NOKIA5110::glcd_PCD8544_init(void) {
 void NOKIA5110::glcd_put_char(char c)
 {
 	int i;
-	glcd_data(0x00);
-	for(i=0;i<5;i++)
+	glcd_data(0x00);					// print some 1x8 vertical blank space;
+	for(i=0;i<5;i++)					// this font has 5 cols length of 1 byte each;
 	{
 		glcd_data(FontNew[(c-32)*5+i]);
 	}
 
 //	for(i=0;i<23;i++)
 //	{
-//		glcd_data(Numbers[(c-32)*23+i]);
+//		glcd_data(Numbers[(c-(32+17))*23+i]);
 //	}
 }
 void NOKIA5110::glcd_put_string(uint8_t x, uint8_t y, char const *str)
@@ -578,8 +579,88 @@ void NOKIA5110::glcd_example()
 	glcd_command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYNORMAL);
 	glcd_put_string(13, 3, str1);
 }
+void NOKIA5110::glcd_big_str(uint8_t x, uint8_t y, char const *str)
+{
+
+	int i, k, length = strlen(str);
+	uint8_t x1, y1;
+
+	x1 = x;
+	y1 = y;
+
+	int vl_len = 23;			// vector line lenght			22+1 = 23 the first is the character size
+	int vc_len = (vl_len-1)/2;	// graph character line length	11;
+
+	for(i=0;i<length;i++)
+	{
+		glcd_set_x_address(x1+vc_len*i);	// 0, 11, 23, 35
+		glcd_set_y_address(y1);
+		for(k=0;k<vc_len;k++)
+		{
+			glcd_data(Arial2[vl_len*(str[i]-32)+2*k+1]);
+		}
+
+		glcd_set_x_address(x1+vc_len*i);
+		glcd_set_y_address(y1+1);
+		for(k=0;k<vc_len;k++)
+		{
+			glcd_data(Arial2[vl_len*(str[i]-32)+2*k+2]);
+		}
+
+	}
+//	glcd_data(0x00);					// print some 1x8 vertical blank space;
+//	for(i=0;i<5;i++)					// this font has 5 cols length of 1 byte each;
+//	{
+//		glcd_data(FontNew[(c-32)*5+i]);
+//	}
 
 
+
+//	glcd.glcd_set_x_address(0);
+//	glcd.glcd_set_y_address(0);
+//	glcd.glcd_data(0x00);
+//	for(i=0;i<11;i++)
+//	{
+//		glcd.glcd_data(Arial[23*3+2*i+1]);
+//	}
+//
+//	glcd.glcd_set_x_address(1);
+//	glcd.glcd_set_y_address(1);
+//	for(i=0;i<11;i++)
+//	{
+//		glcd.glcd_data(Arial[23*3+2*i+2]);
+//	}
+//
+//	glcd.glcd_set_x_address(12);
+//	glcd.glcd_set_y_address(0);
+//	glcd.glcd_data(0x00);
+//	for(i=0;i<11;i++)
+//	{
+//		glcd.glcd_data(Arial[23*2+2*i+1]);
+//	}
+//
+//	glcd.glcd_set_x_address(13);
+//	glcd.glcd_set_y_address(1);
+//	for(i=0;i<11;i++)
+//	{
+//		glcd.glcd_data(Arial[23*2+2*i+2]);
+//	}
+//
+//	glcd.glcd_set_x_address(26);
+//	glcd.glcd_set_y_address(0);
+//	glcd.glcd_data(0x00);
+//	for(i=0;i<11;i++)
+//	{
+//		glcd.glcd_data(Arial[23*1+2*i+1]);
+//	}
+//
+//	glcd.glcd_set_x_address(27);
+//	glcd.glcd_set_y_address(1);
+//	for(i=0;i<11;i++)
+//	{
+//		glcd.glcd_data(Arial[23*1+2*i+2]);
+//	}
+}
 
 
 

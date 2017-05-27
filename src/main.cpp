@@ -11,6 +11,7 @@
 #include "Hardware/adc.h"
 
 #include "nokia5110/nokia5110.h"
+#include "nokia5110/fonts/fonts.h"
 
 ACIONNA acn;
 ADC convert;
@@ -33,46 +34,38 @@ int main(void)
 	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
 	Serial.println("Acionna v2.0");
 	acn.blink_led(2, 150);
-
-//	acn.gateConfig(1,1);
-//	acn.gateConfig(2,1);
-//	acn.gateConfig(3,1);
-//	acn.gateConfig(32,1);
-//
-//	while(1)
-//	{
-//		acn.gateSet(32,1);
-//		acn.gateSet(3,1);
-//		acn.gateSet(2,1);
-//		acn.gateSet(1,1);
-//
-//		acn.gateSet(32,0);
-//		acn.gateSet(3,0);
-//		acn.gateSet(2,0);
-//		acn.gateSet(1,0);
-//	}
-
 	glcd.glcd_init();
 	weight.begin_loadcell();
-
 	int P;
+
+//	int c=10;
+//	while(1)
+//	{
+//		sprintf(Serial.buffer,"%4.1d g", c);
+//		glcd.glcd_big_str(0,0, Serial.buffer);
+//		c++;
+//		_delay_ms(500);
+//	}
+
 
 	while(1)
 	{
-//		sprintf(Serial.buffer,"V= %lu, P= %d", value, P);
-
 		P = weight.get_weight();
 
 		if(P>0)
 		{
-			sprintf(Serial.buffer,"%4.1d.%.2d g    ", (P/weight.Waccu), P%weight.Waccu);
+			sprintf(Serial.buffer,"%4.1d.%.2d", (P/weight.Waccu), P%weight.Waccu);
 		}
 		else
-			sprintf(Serial.buffer,"%4.1d.%.2d g    ", P/weight.Waccu, abs(P%weight.Waccu));
+			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, abs(P%weight.Waccu));
 
+//		sprintf(Serial.buffer,"%4.1d", P/100);
 		Serial.println(Serial.buffer);
-		glcd.glcd_put_string(10,2,Serial.buffer);
+		glcd.glcd_big_str(0,2,Serial.buffer);
 
+		glcd.glcd_put_string(70,4," g");
+
+//		sprintf(Serial.buffer,"V= %lu, P= %d", value, P);
 //		if(weigth.pin_data_get())
 //		{
 //			weigth.drive_led(1);
