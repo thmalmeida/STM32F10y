@@ -23,13 +23,14 @@ void GPIO::gateConfig(uint8_t pin, uint8_t dir)
 
 	if(dir)
 	{
-		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-//		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD;
+		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	// Push pull
+//		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_OD;	// open drain
 		GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	}
 	else
 	{
-		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;	// Pull-Up mode
+//		GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;	// Pull-Down mode
 	}
 
 	switch (pin)
@@ -439,6 +440,10 @@ void GPIO::gateToggle(uint8_t pin)
 		case 3:
 			GPIOC -> ODR ^= (1<<15);
 			break;
+
+		case 30:
+			GPIOB -> ODR ^= (1<<7);
+			break;
 	}
 
 }
@@ -476,6 +481,13 @@ uint8_t GPIO::gateRead(uint8_t pin, uint8_t reg)	// reg: read register input IDR
 				status = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_0);
 			else
 				status = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
+			break;
+
+		case 30:
+			if(reg)
+				status = GPIO_ReadOutputDataBit(GPIOB, GPIO_Pin_7);
+			else
+				status = GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_7);
 			break;
 
 		case 31:

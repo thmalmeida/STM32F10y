@@ -52,12 +52,25 @@ int main(void)
 	{
 		P = weight.get_weight();
 
-		if(P>0)
+		if(weight.readTareButton())
 		{
-			sprintf(Serial.buffer,"%4.1d.%.2d", (P/weight.Waccu), P%weight.Waccu);
+			weight.tareSystem3();
+			glcd.glcd_clear2();
 		}
-		else
-			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, abs(P%weight.Waccu));
+
+//		sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu))/100);	// 2 digitos
+		sprintf(Serial.buffer,"%4.1d.%.1d", P/(weight.Waccu), abs(P%(weight.Waccu))/1000);	// 1 digito para Waccur 10000
+//		if(P>0)
+//		{
+////			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, P%weight.Waccu);
+//			sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu*10)));
+//		}
+//		else
+//		{
+////			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, abs(P%weight.Waccu));
+////			sprintf(Serial.buffer,"%3.1d.%.3d", P/weight.Waccu, abs(P%(weight.Waccu)));
+//			sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu*10)));
+//		}
 
 //		sprintf(Serial.buffer,"%4.1d", P/100);
 		Serial.println(Serial.buffer);

@@ -47,6 +47,11 @@
 #include "Hardware/spi.h"
 #include "Hardware/gpio.h"
 
+#define pin_data_HX711	32
+#define pin_sck_HX711	31
+#define pin_tare_HX711	30
+#define pin_led			1
+
 class LOADCELL : public GPIO , ADC {
 public:
 
@@ -59,8 +64,9 @@ public:
 	int WeightVect[nWeight];
 	int signalVect[nWeight];
 
-	static const int Waccu = 100;
-	double Kc = 1.3295;				// proportional constant;
+	static const int Waccu = 10000;
+	static const int Werror = Waccu*0.10;// 1000;
+	double Kc = 1.3299;				// proportional constant;
 	double Vrange = 20.0;			// Small signal scale range [mV];
 	double scaleHalf = 8388607.0;	// ((2^24)/2)-1;
 	double Wmax = 1000.0;			// Sensor max weight [g];
@@ -76,17 +82,20 @@ public:
 
 	void tareSystem();
 	void tareSystem2();
+	void tareSystem3();
+	int readTareButton();
 
 private:
 };
 
 void LOADCELL::begin_loadcell()
 {
-	gateConfig(31, 1);	// sck pin
-	gateConfig(32, 0);	// data pin
-	gateConfig(1, 1);	// led
+	gateConfig(pin_data_HX711, 0);	// data pin
+	gateConfig(pin_sck_HX711, 1);	// sck pin
+	gateConfig(pin_tare_HX711, 0);	// data pin
+	gateConfig(pin_led, 1);			// led
 
-	tareSystem2();
+//	tareSystem3();
 }
 void LOADCELL::tareSystem()
 {
@@ -100,7 +109,6 @@ void LOADCELL::tareSystem()
 }
 void LOADCELL::tareSystem2()
 {
-
 	while(get_weight() != 0)
 	{
 		get_weight();
@@ -113,17 +121,26 @@ void LOADCELL::tareSystem2()
 		offset = Ssum/nWeight;
 	}
 }
+void LOADCELL::tareSystem3()
+{
+	int Ssum = 0;
+	for(int i=0; i<nWeight; i++)
+	{
+		Ssum+= signalVect[i];
+	}
+	offset = Ssum/nWeight;
+}
 void LOADCELL::pin_sck_set(uint8_t status)
 {
-	gateSet(31, status);
+	gateSet(pin_sck_HX711, status);
 }
 uint32_t LOADCELL::pin_data_get()
 {
-	return (uint32_t) gateRead(32, 0);
+	return (uint32_t) gateRead(pin_data_HX711, 0);
 }
 void LOADCELL::pin_data_set(uint8_t status)
 {
-	gateSet(32, status);
+	gateSet(pin_data_HX711, status);
 }
 int LOADCELL::readInput()
 {
@@ -177,6 +194,18 @@ int LOADCELL::readInput()
 
 	return Count;
 }
+int LOADCELL::readTareButton()
+{
+	uint8_t status = 0;
+	status = !gateRead(pin_tare_HX711, 0);
+
+	if(status)
+	{
+		_delay_ms(50);
+	}
+
+	return status;
+}
 int LOADCELL::get_weight(void)
 {
 	int signal = readInput();
@@ -185,7 +214,7 @@ int LOADCELL::get_weight(void)
 	int WeightTemp = (int) Waccu*(a*Wmax/Vref);
 
 	int error = WeightTemp - WeightX10;
-	if(abs(error) > 15)
+	if(abs(error) > Werror)
 	{
 		for(int i=1; i<nWeight;i++)
 		{
@@ -213,7 +242,7 @@ int LOADCELL::get_weight(void)
 }
 void LOADCELL::drive_led(uint8_t status)
 {
-	gateSet(1, status);
+	gateSet(pin_led, status);
 }
 #endif /* HARDWARE_H_ */
 
