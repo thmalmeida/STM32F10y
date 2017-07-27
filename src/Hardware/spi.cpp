@@ -6,18 +6,50 @@
  */
 #include "spi.h"
 
-void SPI::set_SPI_to_Master(uint8_t mode)
+/*
+ *	// mode=1; used on nokia5110 GLCD
+ *	// for SPI2 does not have remap option;
+ */
+
+#define SPIy			SPI1
+
+#define SPI1_PORT		GPIOA
+#define SPI1_PIN_MOSI	GPIO_Pin_7
+#define SPI1_PIN_MISO	GPIO_Pin_6
+#define SPI1_PIN_SCK 	GPIO_Pin_5
+#define SPI1_PIN_NSS 	GPIO_Pin_4
+
+#define SPI2_PORT		GPIOB
+#define SPI2_PIN_MOSI	GPIO_Pin_15
+#define SPI2_PIN_MISO	GPIO_Pin_14
+#define SPI2_PIN_SCK 	GPIO_Pin_13
+#define SPI2_PIN_NSS 	GPIO_Pin_12
+
+void SPI::set_SPI_to_Master(uint8_t mode, uint8_t spi_port)//, uint8_t spi_remap)
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+	switch (spi_port)
+	{
+		case 1:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = SPI1_PIN_MISO | SPI1_PIN_SCK | SPI1_PIN_MOSI;
+			GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+			GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+			GPIO_Init(SPI1_PORT, &GPIO_InitStructure);
+			break;
+
+		case 2:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = SPI2_PIN_MISO | SPI2_PIN_SCK | SPI2_PIN_MOSI;
+			GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+			GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+			GPIO_Init(SPI2_PORT, &GPIO_InitStructure);
+			break;
+	}
+
 
 	/* Configure SPIy pins: SCK, MISO and MOSI ---------------------------------*/
-	GPIO_InitStructure.GPIO_Pin = SPI1_PIN_MISO | SPI1_PIN_SCK | SPI1_PIN_MOSI;
 	/* Configure SCK and MOSI pins as Alternate Function Push Pull */
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(SPI_PORT, &GPIO_InitStructure);
-
 //	GPIO_InitStructure.GPIO_Pin = SPI1_PIN_NSS;
 //	/* Configure SCK and MOSI pins as Alternate Function Push Pull */
 //	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
@@ -36,7 +68,6 @@ void SPI::set_SPI_to_Master(uint8_t mode)
 
 	SPI_InitTypeDef   SPI_InitStructure;
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
 	/* SPIy Config -------------------------------------------------------------*/
 	SPI_InitStructure.SPI_Mode = SPI_Mode_Master;		// Slave mode selected
 	SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;	// byte size
@@ -64,9 +95,25 @@ void SPI::set_SPI_to_Master(uint8_t mode)
 		}
 	}
 
-	SPI_Init(SPI1, &SPI_InitStructure);
+	switch (spi_port)
+	{
+		case 1:
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
 
-	SPI_NSSInternalSoftwareConfig(SPI1, SPI_NSSInternalSoft_Set);
+			SPI_Init(SPI1, &SPI_InitStructure);
+			SPI_NSSInternalSoftwareConfig(SPI1, SPI_NSSInternalSoft_Set);
+			SPI_Cmd(SPI1, ENABLE);
+
+			break;
+
+		case 2:
+			RCC_APB2PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
+
+			SPI_Init(SPI2, &SPI_InitStructure);
+			SPI_NSSInternalSoftwareConfig(SPI2, SPI_NSSInternalSoft_Set);
+			SPI_Cmd(SPI2, ENABLE);
+			break;
+	}
 
 //	SPI_SSOutputCmd(SPI1, ENABLE);
 //	Interrupt ------
@@ -82,7 +129,6 @@ void SPI::set_SPI_to_Master(uint8_t mode)
 //	NVIC_Init(&NVIC_InitStructure);								// the properties are passed to the NVIC_Init function which takes care of the low level stuff
 //	Interrupt end ---------
 
-	SPI_Cmd(SPI1, ENABLE);
 }
 void SPI::set_SPI_to_Slave()
 {
@@ -94,13 +140,13 @@ void SPI::set_SPI_to_Slave()
 	/* Configure SCK and MOSI pins as Alternate Function Push Pull */
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(SPI_PORT, &GPIO_InitStructure);
+	GPIO_Init(SPI1_PORT, &GPIO_InitStructure);
 
 	GPIO_InitStructure.GPIO_Pin = SPI1_PIN_SCK;
 	/* Configure SCK and MOSI pins as Alternate Function Push Pull */
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(SPI_PORT, &GPIO_InitStructure);
+	GPIO_Init(SPI1_PORT, &GPIO_InitStructure);
 
 //	SPI1_REMAP
 //	GPIO_PinRemapConfig(GPIO_Remap_SPI1, ENABLE);

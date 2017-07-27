@@ -31,16 +31,9 @@
 	SPI1_SCK  - PB3
 	SPI1_NSS  - PA15
 */
-#define SPIy			SPI1
-#define SPI_PORT		GPIOA
-#define SPI1_PIN_MOSI	GPIO_Pin_7
-#define SPI1_PIN_MISO	GPIO_Pin_6
-#define SPI1_PIN_SCK 	GPIO_Pin_5
-#define SPI1_PIN_NSS 	GPIO_Pin_4
 
 class SPI {
 public:
-
 	volatile int SPI1_cnt;
 	volatile unsigned int SPI1_flag_rx;
 	volatile unsigned int SPI1_flag_err;
@@ -49,7 +42,7 @@ public:
 
 	unsigned char SPI_received_string[50]; // this will hold the recieved string
 
-	void set_SPI_to_Master(uint8_t mode);
+	void set_SPI_to_Master(uint8_t mode, uint8_t spi_port);//, uint8_t spi_remap);
 	void set_SPI_to_Slave();
 	void print(char const *s);
 	unsigned char transfer_Byte(uint16_t Data);

@@ -16,7 +16,9 @@
 ACIONNA acn;
 ADC convert;
 
-LOADCELL weight;
+LOADCELL weight1;
+LOADCELL weight2;
+
 NOKIA5110 glcd;
 
 // Wake up interrupts
@@ -30,53 +32,94 @@ int main(void)
 {
 	init();							// uC basic peripherals setup
 
-	acn.begin_acn();				// Class acionna statement
+//	acn.begin_acn();				// Class acionna statement
 	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
 	Serial.println("Acionna v2.0");
 	acn.blink_led(2, 150);
-	glcd.glcd_init();
-	weight.begin_loadcell();
-	int P;
+	glcd.glcd_init(1);
 
-//	int c=10;
+
+	weight1.begin_loadcell(32, 31, 3.0012, 1.1030);
+	weight2.begin_loadcell(30, 29, 3.0012, 1.1030);
+//	weight3.begin_loadcell(27, 26, 3.0012, 1.1030);
+
+	int P[2];
+	P[1] = weight1.get_weight();
+	P[2] = weight2.get_weight();
+
+	weight1.tareSystem3();
+	weight2.tareSystem3();
+	glcd.glcd_clear2();
+
+//	int c=0;
+//	int d=9;
+//
 //	while(1)
 //	{
-//		sprintf(Serial.buffer,"%4.1d g", c);
-//		glcd.glcd_big_str(0,0, Serial.buffer);
-//		c++;
+//		sprintf(Serial.buffer,"%d", c);
+//		glcd.glcd_Arial16x24_str(0,0,Serial.buffer);
+//		glcd.glcd_dot_print(26,3,3);
+//		sprintf(Serial.buffer,"%d", d);
+//		glcd.glcd_Arial16x24_str(27,0,Serial.buffer);
+//
+//		d = c;
+//
+//		if(c>=9)
+//		{
+//			c = 0;
+//		}
+//		else
+//			c++;
+//
+//
 //		_delay_ms(500);
 //	}
 
-
 	while(1)
 	{
-		P = weight.get_weight();
+		P[1] = weight1.get_weight();
+		P[2] = weight2.get_weight();
+//		P[3] = weight3.get_weight();
+//		P[4] = weight4.get_weight();
 
-		if(weight.readTareButton())
-		{
-			weight.tareSystem3();
-			glcd.glcd_clear2();
-		}
+		P[0] = P[1] + P[2];
 
-//		sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu))/100);	// 2 digitos
-		sprintf(Serial.buffer,"%4.1d.%.1d", P/(weight.Waccu), abs(P%(weight.Waccu))/1000);	// 1 digito para Waccur 10000
-//		if(P>0)
+//		if(weight1.readTareButton())
 //		{
-////			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, P%weight.Waccu);
-//			sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu*10)));
+//			weight1.tareSystem3();
+//			weight2.tareSystem3();
+//			glcd.glcd_clear2();
 //		}
-//		else
-//		{
-////			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, abs(P%weight.Waccu));
-////			sprintf(Serial.buffer,"%3.1d.%.3d", P/weight.Waccu, abs(P%(weight.Waccu)));
-//			sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu*10)));
-//		}
+
+		sprintf(Serial.buffer,"Pt: %4.1d", abs(P[0])/1000);		// kilogram digit;
+		glcd.glcd_put_string(0,0,Serial.buffer);
+
+		sprintf(Serial.buffer,"P1: %4.1d", abs(P[1])/1000);		// kilogram digit;
+		glcd.glcd_put_string(0,2,Serial.buffer);
+
+		sprintf(Serial.buffer,"P2: %4.1d", abs(P[2])/1000);		// kilogram digit;
+		glcd.glcd_put_string(0,3,Serial.buffer);
+
+//		sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu*10), abs(P%(weight.Waccu))/100);	// 2 digitos
+
+//		sprintf(Serial.buffer,"P:%.3d.%.3d kg", abs(P/1000), abs(P)%1000);	// 3 digitos;
+//		sprintf(Serial.buffer,"P:%.3d.%.2d kg", abs(P/1000), abs(P/10)%100);	// 2 digitos;
+//		sprintf(Serial.buffer,"%.4d.%.1d", abs(P)/1000, abs(P)/100%10);	// 1 digitos;
+//		glcd.glcd_put_string(0,2,Serial.buffer);
 
 //		sprintf(Serial.buffer,"%4.1d", P/100);
-		Serial.println(Serial.buffer);
-		glcd.glcd_big_str(0,2,Serial.buffer);
 
-		glcd.glcd_put_string(70,4," g");
+//		sprintf(Serial.buffer,"%4.1d", abs(P[0])/1000);		// kilogram digit;
+//		glcd.glcd_Arial16x24_str(1,1,Serial.buffer);
+//		glcd.glcd_dot_print(65,4,3);
+//
+//		sprintf(Serial.buffer,"%.1d", abs(P[0])/100%10);	// 1 digitos;
+////		sprintf(Serial.buffer,"%.2d", abs(P)/10%100);	// 2 digitos;
+////		sprintf(Serial.buffer,"%.3d", abs(P)%1000);		// 3 digitos;
+//		glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+//
+////		glcd.glcd_big_str(8,2,Serial.buffer);
+//		glcd.glcd_put_string(72,5,"kg");
 
 //		sprintf(Serial.buffer,"V= %lu, P= %d", value, P);
 //		if(weigth.pin_data_get())
@@ -106,6 +149,48 @@ int main(void)
 //		}
 	}
 }
+
+//int main(void)
+//{
+//	init();							// uC basic peripherals setup
+//
+//	acn.begin_acn();				// Class acionna statement
+////	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
+////	Serial.println("Acionna v2.0");
+//	acn.blink_led(2, 150);
+//	weight.begin_loadcell();
+//
+////	char c='0';
+////
+////	while(1)
+////	{
+////		sprintf(Serial.buffer, "a: %c", c++);
+////		Serial.println(Serial.buffer);
+////		_delay_ms(500);
+////	}
+//
+////	int c=10;
+////	while(1)
+////	{
+////		sprintf(Serial.buffer,"%4.1d g", c);
+////		glcd.glcd_big_str(0,0, Serial.buffer);
+////		c++;
+////		_delay_ms(500);
+////	}
+//
+//	weight.example1();
+//
+//	while(1)
+//	{
+////		acn.comm_Bluetooth();
+////
+////		acn.refreshVariables();
+////
+////		acn.handleMessage();
+////
+////		acn.process_Mode();
+//	}
+//}
 
 //const char * m()
 //{
@@ -260,7 +345,91 @@ void SPI1_IRQHandler(void)
 	}
 #endif
 }
-
+//void SPI2_IRQHandler(void)
+//{
+//#ifdef master
+//	//	static unsigned short int count = 0, i = 0 ;
+//	//	check if the SPI1 receive interrupt flag was set
+//	//	Master interrupt
+//	//	TX: 1- empty
+//	//	if(SPI1 -> SR & 0x0002)
+//		if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_TXE) == SET)
+//		{
+//			SerialSPI.SPI1_flag_rx = 1;
+//			SerialSPI.SPI1_rxd++;
+//			SerialSPI.SPI1_txd = SerialSPI.SPI1_rxd;
+//			SPI1 -> DR = SerialSPI.SPI1_txd;
+//	//		Wait until the data has been transmitted.
+//	//		while (!(SPI1->SR & SPI_I2S_FLAG_TXE));
+//	//		USART1_print("Transmitting: ");
+//	//		USART1_putc(0x40);
+//		}
+////	//	if(SPI1 -> SR & SPI_I2S_FLAG_RXNE)
+////		//	RX: 1- not empty
+////	//	if(SPI1 -> SR & 0x0001)
+//		if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_RXNE) == SET)
+//		{
+//			SerialSPI.SPI1_flag_rx = 1;
+//			SerialSPI.SPI1_rxd = SPI1 -> DR;
+//			if(SerialSPI.SPI1_cnt < MAX_STRLEN)
+//			{
+//				SerialSPI.SPI_received_string[SerialSPI.SPI1_cnt] = SerialSPI.SPI1_rxd;
+//				SerialSPI.SPI1_cnt++;
+//			}
+//			else
+//			{
+//				memset(SerialSPI.SPI_received_string, 0, sizeof(SerialSPI.SPI_received_string));
+//				SerialSPI.SPI1_cnt = 0;
+//			}
+//		}
+//
+//	//	if(SPI1 -> SR & 0x0100)
+//		if(SPI_I2S_GetITStatus(SPI1, SPI_IT_CRCERR))
+//		{
+//			SerialSPI.SPI1_flag_err = 1;
+//		}
+//#else
+////	static unsigned short int count = 0, i = 0 ;
+////	check if the SPI1 receive interrupt flag was set
+////	Slave interrupt
+////	TX: 1- empty
+////	if(SPI1 -> SR & 0x0002)
+//	if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_TXE) == SET)
+//	{
+//		SerialSPI.SPI1_rxd++;
+//		SerialSPI.SPI1_txd = SerialSPI.SPI1_rxd;
+//		SPI1 -> DR = SerialSPI.SPI1_txd;
+////		Wait until the data has been transmitted.
+////		while (!(SPI1->SR & SPI_I2S_FLAG_TXE));
+////		USART1_print("Transmitting: ");
+////		USART1_putc(0x40);
+//	}
+////	if(SPI1 -> SR & SPI_I2S_FLAG_RXNE)
+//	//	RX: 1- not empty
+////	if(SPI1 -> SR & 0x0001)
+//	if(SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_RXNE) == SET)
+//	{
+//		SerialSPI.SPI1_flag_rx = 1;
+//		SerialSPI.SPI1_rxd = SPI1 -> DR;
+//		if(SerialSPI.SPI1_cnt < MAX_STRLEN)
+//		{
+//			SerialSPI.SPI_received_string[SerialSPI.SPI1_cnt] = SerialSPI.SPI1_rxd;
+//			SerialSPI.SPI1_cnt++;
+//		}
+//		else
+//		{
+//			memset(SerialSPI.SPI_received_string, 0, sizeof(SerialSPI.SPI_received_string));
+//			SerialSPI.SPI1_cnt = 0;
+//		}
+//	}
+//
+////	if(SPI1 -> SR & 0x0100)
+//	if(SPI_I2S_GetITStatus(SPI1, SPI_IT_CRCERR))
+//	{
+//		SerialSPI.SPI1_flag_err = 1;
+//	}
+//#endif
+//}
 }
 /*
  * Interruptions sequence END

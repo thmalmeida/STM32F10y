@@ -47,33 +47,42 @@
 #include "Hardware/spi.h"
 #include "Hardware/gpio.h"
 
-#define pin_data_HX711	32
-#define pin_sck_HX711	31
-#define pin_tare_HX711	30
+#include "nokia5110/nokia5110.h"
+
+//#define pin_data_HX711	32
+//#define pin_sck_HX711	31
+#define pin_tare_HX711	24
 #define pin_led			1
 
-class LOADCELL : public GPIO , ADC {
+class LOADCELL : ADC, GPIO {
 public:
 
-	int timeD = 1;
-	int offset = 0;					// offset after tare;
-	int WeightX10;					// currently weight x10;
+	uint8_t pin_data_HX711;
+	uint8_t pin_sck_HX711;
 
-	static const int nWeight = 200;
+	int timeD = 1;							// time/frequency of HX711 interface;
+	int offset = 0;							// offset after tare;
+	int Weight;							// currently weight x10;
 
-	int WeightVect[nWeight];
-	int signalVect[nWeight];
+	int P;									// currently weight found;
 
-	static const int Waccu = 10000;
-	static const int Werror = Waccu*0.10;// 1000;
-	double Kc = 1.3299;				// proportional constant;
-	double Vrange = 20.0;			// Small signal scale range [mV];
-	double scaleHalf = 8388607.0;	// ((2^24)/2)-1;
-	double Wmax = 1000.0;			// Sensor max weight [g];
-	double Vref = 4.97;				// Voltage reference [V];
+	static const int nWeight = 200;			// number of samples to count into average summation;
+
+	int WeightVect[nWeight];				// vector of weights calculated;
+	int signalVect[nWeight];				// digital values obtained from HX711 24 bits;
+
+	static const int Waccu = 100;			//
+	static const int Werror = Waccu*0.10;	// 1000;
+//	double Kc = 1.3299;						// mV/V signal response;
+	double Kc = 3.0012;						// mV/V signal response;
+	double Kp = 1.1030;						// proportional constant;
+	double Vrange = 20.0;					// Small signal scale range [mV];
+	double scaleHalf = 8388607.0;			// ((2^24)/2)-1;
+	double Wmax = 1000.0;					// Sensor max weight [g];
+	double Vref = 4.97;						// Voltage reference [V];
 
 	void drive_led(uint8_t status);
-	void begin_loadcell();
+	void begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _Kc, double _Kp);
 	int readInput();
 	void pin_sck_set(uint8_t status);
 	void pin_data_set(uint8_t status);
@@ -85,16 +94,30 @@ public:
 	void tareSystem3();
 	int readTareButton();
 
+	void example1(void);
+
 private:
 };
 
-void LOADCELL::begin_loadcell()
+//#define pin_data_HX711	32
+//#define pin_sck_HX711		31
+//#define pin_tare_HX711	30
+//#define pin_led			1
+
+void LOADCELL::begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _Kc, double _Kp)
 {
-	gateConfig(pin_data_HX711, 0);	// data pin
-	gateConfig(pin_sck_HX711, 1);	// sck pin
+	gateConfig(pin_data, 0);		// data pin
+	gateConfig(pin_sck, 1);			// sck pin
 	gateConfig(pin_tare_HX711, 0);	// data pin
 	gateConfig(pin_led, 1);			// led
 
+	pin_data_HX711 = pin_data;
+	pin_sck_HX711 = pin_sck;
+
+	Kc = _Kc;
+	Kp = _Kp;
+
+//	glcd_init();
 //	tareSystem3();
 }
 void LOADCELL::tareSystem()
@@ -208,12 +231,13 @@ int LOADCELL::readTareButton()
 }
 int LOADCELL::get_weight(void)
 {
-	int signal = readInput();
-	double Vdig = (signal - offset);
-	double a = (Kc*Vrange*Vdig)/scaleHalf;
-	int WeightTemp = (int) Waccu*(a*Wmax/Vref);
+	int signal = readInput();							// Read the ADC channel;
+	double Vdig = (signal - offset);					// Remove the offset on pure signal;
+	double a = (Kp*Kc*Vrange*Vdig)/scaleHalf;			// Apply equation and obtain the weight in floating point format;
+	int WeightTemp = (int) Waccu*(a*Wmax/Vref);			// Amplifier the value to remove floating point and get an integer number;
 
-	int error = WeightTemp - WeightX10;
+
+	int error = WeightTemp - Weight;					// This process accelerate to the outcome convergence;
 	if(abs(error) > Werror)
 	{
 		for(int i=1; i<nWeight;i++)
@@ -221,7 +245,7 @@ int LOADCELL::get_weight(void)
 			signalVect[i] = signal;
 			WeightVect[i] = WeightTemp;
 		}
-		WeightX10 = WeightTemp;
+		Weight = WeightTemp;
 	}
 	else
 	{
@@ -235,15 +259,45 @@ int LOADCELL::get_weight(void)
 		signalVect[0] = signal;
 		WeightVect[0] = WeightTemp;
 		Wsum+= WeightVect[0];
-		WeightX10 = Wsum/nWeight;
+		Weight = Wsum/nWeight;
 	}
 
-	return WeightX10;
+	return Weight;
 }
 void LOADCELL::drive_led(uint8_t status)
 {
 	gateSet(pin_led, status);
 }
+void LOADCELL::example1(void)
+{
+	P = get_weight();
+
+	if(readTareButton())
+	{
+		tareSystem3();
+//		glcd_clear2();
+	}
+
+//		sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu))/100);	// 2 digitos
+	sprintf(Serial.buffer,"%5.1d.%.1d", P/(Waccu), abs(P%(Waccu))/1000);	// 1 digito para Waccur 10000
+//		if(P>0)
+//		{
+////			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, P%weight.Waccu);
+//			sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu*10)));
+//		}
+//		else
+//		{
+////			sprintf(Serial.buffer,"%4.1d.%.2d", P/weight.Waccu, abs(P%weight.Waccu));
+////			sprintf(Serial.buffer,"%3.1d.%.3d", P/weight.Waccu, abs(P%(weight.Waccu)));
+//			sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu), abs(P%(weight.Waccu*10)));
+//		}
+
+//		sprintf(Serial.buffer,"%4.1d", P/100);
+//	Serial.println(Serial.buffer);
+//	glcd_big_str(0,2,Serial.buffer);
+//	glcd_put_string(70,4," g");
+}
+
 #endif /* HARDWARE_H_ */
 
 #endif /* ACIONNA_H_ */

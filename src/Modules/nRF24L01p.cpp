@@ -83,7 +83,7 @@ void nRF24L01p::configurePins()
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-	set_SPI_to_Master(0);	// the slave one is the nRF24L01p chip
+	set_SPI_to_Master(0, 1);//, 0);	// the slave one is the nRF24L01p chip
 }
 uint8_t nRF24L01p::read_register(uint8_t reg)
 {
