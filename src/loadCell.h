@@ -51,7 +51,7 @@
 
 //#define pin_data_HX711	32
 //#define pin_sck_HX711	31
-#define pin_tare_HX711	24
+#define pin_tare_HX711	27
 #define pin_led			1
 
 class LOADCELL : ADC, GPIO {
@@ -60,28 +60,34 @@ public:
 	uint8_t pin_data_HX711;
 	uint8_t pin_sck_HX711;
 
+
+	uint8_t stable = 0;
+
 	int timeD = 1;							// time/frequency of HX711 interface;
 	int offset = 0;							// offset after tare;
-	int Weight;							// currently weight x10;
+	int Weight = 0;							// currently weight x10;
 
 	int P;									// currently weight found;
 
-	static const int nWeight = 200;			// number of samples to count into average summation;
+	static const int nWeight = 50;			// number of samples to count into average summation;
 
 	int WeightVect[nWeight];				// vector of weights calculated;
 	int signalVect[nWeight];				// digital values obtained from HX711 24 bits;
+	int signal;
 
+	double beta = 0.05;
 	static const int Waccu = 100;			//
-	static const int Werror = Waccu*0.10;	// 1000;
+//	static const int Werror = Waccu*0.10;	// 1000;
 //	double Kc = 1.3299;						// mV/V signal response;
 	double Kc = 3.0012;						// mV/V signal response;
 	double Kp = 1.1030;						// proportional constant;
 	double Vrange = 20.0;					// Small signal scale range [mV];
 	double scaleHalf = 8388607.0;			// ((2^24)/2)-1;
 	double Wmax = 1000.0;					// Sensor max weight [g];
-	double Vref = 4.97;						// Voltage reference [V];
+	double Vref = 5.14;						// Voltage reference [V];
 
 	void drive_led(uint8_t status);
+	void drive_led_blink();
 	void begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _Kc, double _Kp);
 	int readInput();
 	void pin_sck_set(uint8_t status);
@@ -120,30 +126,30 @@ void LOADCELL::begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _Kc, dou
 //	glcd_init();
 //	tareSystem3();
 }
-void LOADCELL::tareSystem()
-{
-	int i, n = 100;
-
-	for(i=0;i<n;i++)
-	{
-		offset += readInput();
-	}
-	offset = offset/n;
-}
-void LOADCELL::tareSystem2()
-{
-	while(get_weight() != 0)
-	{
-		get_weight();
-
-		int Ssum = 0;
-		for(int i=0; i< nWeight ;i++)
-		{
-			Ssum+= signalVect[i];
-		}
-		offset = Ssum/nWeight;
-	}
-}
+//void LOADCELL::tareSystem()
+//{
+//	int i, n = 100;
+//
+//	for(i=0;i<n;i++)
+//	{
+//		offset += readInput();
+//	}
+//	offset = offset/n;
+//}
+//void LOADCELL::tareSystem2()
+//{
+//	while(get_weight() != 0)
+//	{
+//		get_weight();
+//
+//		int Ssum = 0;
+//		for(int i=0; i< nWeight ;i++)
+//		{
+//			Ssum+= signalVect[i];
+//		}
+//		offset = Ssum/nWeight;
+//	}
+//}
 void LOADCELL::tareSystem3()
 {
 	int Ssum = 0;
@@ -152,6 +158,10 @@ void LOADCELL::tareSystem3()
 		Ssum+= signalVect[i];
 	}
 	offset = Ssum/nWeight;
+
+	Weight = 0;
+
+	drive_led_blink();
 }
 void LOADCELL::pin_sck_set(uint8_t status)
 {
@@ -231,42 +241,99 @@ int LOADCELL::readTareButton()
 }
 int LOADCELL::get_weight(void)
 {
-	int signal = readInput();							// Read the ADC channel;
+	signal = readInput();							// Read the ADC channel;
 	double Vdig = (signal - offset);					// Remove the offset on pure signal;
 	double a = (Kp*Kc*Vrange*Vdig)/scaleHalf;			// Apply equation and obtain the weight in floating point format;
 	int WeightTemp = (int) Waccu*(a*Wmax/Vref);			// Amplifier the value to remove floating point and get an integer number;
 
 
+
 	int error = WeightTemp - Weight;					// This process accelerate to the outcome convergence;
-	if(abs(error) > Werror)
+
+	if(abs(error) < 70)
+	{
+		beta = 0.01;
+	}
+	else if(abs(error) < 100)
+	{
+		beta = 0.02;
+	}
+	else if(abs(error) < 200)
+	{
+		beta = 0.03;
+	}
+	else if(abs(error) < 500)
+	{
+		beta = 0.05;
+	}
+	else if(abs(error) > 500 && abs(error) < 1000)
+	{
+		beta = 0.1;
+	}
+	else if(abs(error) > 1000 && abs(error) < 2000)
+	{
+		beta = 0.2;
+	}
+	else if(abs(error) > 2000 && abs(error) < 3000)
+	{
+		beta = 0.3;
+	}
+	else if(abs(error) > 3000 && abs(error) < 5000)
+	{
+		beta = 0.5;
+	}
+	else if(abs(error) > 5000 && abs(error) < 10000)
+	{
+		beta = 0.7;
+	}
+	else
+	{
+		beta = 1.0;
+	}
+
+	if(beta == 1.0)
 	{
 		for(int i=1; i<nWeight;i++)
 		{
 			signalVect[i] = signal;
-			WeightVect[i] = WeightTemp;
+//			WeightVect[i] = WeightTemp;
 		}
-		Weight = WeightTemp;
+//		Weight = WeightTemp;
 	}
 	else
 	{
-		int Wsum = 0;
-		for(int i=(nWeight-1);i>0;i--)
-		{
+		//	int Wsum = 0;
+			for(int i=(nWeight-1);i>0;i--)
+			{
 			signalVect[i] = signalVect[i-1];
-			WeightVect[i] = WeightVect[i-1];
-			Wsum+= WeightVect[i];
-		}
-		signalVect[0] = signal;
-		WeightVect[0] = WeightTemp;
-		Wsum+= WeightVect[0];
-		Weight = Wsum/nWeight;
+		//		WeightVect[i] = WeightVect[i-1];
+		//		Wsum+= WeightVect[i];
+			}
+			signalVect[0] = signal;
+		//	WeightVect[0] = WeightTemp;
+		//	Wsum+= WeightVect[0];
+		//	Weight = Wsum/nWeight;
+	}
+
+	if(beta <= 0.05)
+	{
+		stable = 1;
+	}
+	else
+	{
+		stable = 0;
+		Weight = beta*WeightTemp + Weight - beta*Weight;	// Low Pass Filter
 	}
 
 	return Weight;
 }
+void LOADCELL::drive_led_blink()
+{
+	 gateToggle(pin_led);
+}
 void LOADCELL::drive_led(uint8_t status)
 {
-	gateSet(pin_led, status);
+	gateSet(pin_led, !status);
 }
 void LOADCELL::example1(void)
 {

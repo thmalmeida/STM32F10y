@@ -119,11 +119,13 @@ public:
 	void glcd_power_up(void);
 	void glcd_PCD8544_init(void);
 	void glcd_example();
-	void glcd_dot_print(uint8_t x, uint8_t y, uint8_t size);
+	void glcd_dot_print(uint8_t x, uint8_t y, uint8_t size, uint8_t value);
 	void glcd_Arial16x24_str(uint8_t x, uint8_t y, char const *str);
 	void glcd_big_str(uint8_t x, uint8_t y, char const *str);
 
 	void glcd_SPI1_debug();
+
+	void glcd_backlight(uint8_t status);
 
 protected:
 	void LCD_ENABLE();
@@ -132,8 +134,6 @@ protected:
 	void LCD_RESET_OFF();
 	void LCD_DC_COMMAND();
 	void LCD_DC_DATA();
-	void LCD_LED_OFF();
-	void LCD_LED_ON();
 };
 
 void NOKIA5110::LCD_ENABLE()
@@ -166,15 +166,12 @@ void NOKIA5110::LCD_DC_DATA()
 //	GPIO_SetBits(LCD_PORT, LCD_PIN_COMMAND);
 	gateSet(LCD_PIN_COMMAND, 1);
 }
-void NOKIA5110::LCD_LED_OFF()
+void NOKIA5110::glcd_backlight(uint8_t status)
 {
-//	GPIO_ResetBits(LCD_PORT, LCD_PIN_LED);
-	gateSet(LCD_PIN_LED, 0);
-}
-void NOKIA5110::LCD_LED_ON()
-{
-//	GPIO_SetBits(LCD_PORT, LCD_PIN_LED);
-	gateSet(LCD_PIN_LED, 1);
+	if(status)
+		gateSet(LCD_PIN_LED, 1);
+	else
+		gateSet(LCD_PIN_LED, 0);
 }
 void NOKIA5110::RCC_Configuration(void)
 {
@@ -266,7 +263,7 @@ void NOKIA5110::glcd_init(uint8_t spi_port)//, uint8_t spi_remap)	// spi_port=1 
 
 	// --- Reset and Enable
 	glcd_reset();
-	LCD_LED_ON();
+	glcd_backlight(1);
 
 	// --- glcd intialization
 	// get into the EXTENDED mode!
@@ -467,7 +464,7 @@ void NOKIA5110::glcd_example()
 	glcd_command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYNORMAL);
 	glcd_put_string(13, 3, str1);
 }
-void NOKIA5110::glcd_dot_print(uint8_t x, uint8_t y, uint8_t size)
+void NOKIA5110::glcd_dot_print(uint8_t x, uint8_t y, uint8_t size, uint8_t value)
 {
 	int i;
 
@@ -477,7 +474,7 @@ void NOKIA5110::glcd_dot_print(uint8_t x, uint8_t y, uint8_t size)
 	glcd_data(0x00);		// little space before
 	for(i=0;i<size;i++)
 	{
-		glcd_data(0x07);	// square dot
+		glcd_data(value);	// square dot
 	}
 	glcd_data(0x00);		// little space after dot
 }
