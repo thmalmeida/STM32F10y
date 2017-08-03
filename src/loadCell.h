@@ -250,33 +250,29 @@ int LOADCELL::get_weight(void)
 
 	int error = WeightTemp - Weight;					// This process accelerate to the outcome convergence;
 
-	if(abs(error) < 70)
+	if(abs(error) < 100)
 	{
 		beta = 0.01;
 	}
-	else if(abs(error) < 100)
+	else if(abs(error) < 200)
 	{
 		beta = 0.02;
 	}
-	else if(abs(error) < 200)
+	else if(abs(error) < 500)
 	{
 		beta = 0.03;
 	}
-	else if(abs(error) < 500)
-	{
-		beta = 0.05;
-	}
 	else if(abs(error) > 500 && abs(error) < 1000)
 	{
-		beta = 0.1;
+		beta = 0.07;
 	}
 	else if(abs(error) > 1000 && abs(error) < 2000)
 	{
-		beta = 0.2;
+		beta = 0.1;
 	}
 	else if(abs(error) > 2000 && abs(error) < 3000)
 	{
-		beta = 0.3;
+		beta = 0.2;
 	}
 	else if(abs(error) > 3000 && abs(error) < 5000)
 	{
@@ -284,7 +280,7 @@ int LOADCELL::get_weight(void)
 	}
 	else if(abs(error) > 5000 && abs(error) < 10000)
 	{
-		beta = 0.7;
+		beta = 0.8;
 	}
 	else
 	{
@@ -315,15 +311,16 @@ int LOADCELL::get_weight(void)
 		//	Weight = Wsum/nWeight;
 	}
 
-	if(beta <= 0.05)
+	if(abs(error) <= 1000)
 	{
 		stable = 1;
 	}
 	else
 	{
 		stable = 0;
-		Weight = beta*WeightTemp + Weight - beta*Weight;	// Low Pass Filter
 	}
+
+	Weight = beta*WeightTemp + Weight - beta*Weight;	// Low Pass Filter
 
 	return Weight;
 }

@@ -411,16 +411,15 @@ int main(void)
 			glcd.glcd_clear2();
 		}
 
+		showResults();
+
 		if(weight1.stable)
 		{
 			weight1.drive_led(1);
-			glcd.glcd_backlight(1);
-			showResults();
 		}
 		else
 		{
 			weight1.drive_led(0);
-			glcd.glcd_backlight(0);
 		}
 
 //		sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu*10), abs(P%(weight.Waccu))/100);	// 2 digitos
