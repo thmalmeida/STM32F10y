@@ -78,17 +78,18 @@ public:
 	double beta = 0.05;
 	static const int Waccu = 100;			//
 //	static const int Werror = Waccu*0.10;	// 1000;
-//	double Kc = 1.3299;						// mV/V signal response;
-	double Kc = 3.0012;						// mV/V signal response;
-	double Kp = 1.1030;						// proportional constant;
+//	double A = 1.3299;						// mV/V signal response;
+	double A;//= 3.0012;						// mV/V signal response;
+	double Kp;// = 1.1030;						// proportional constant;
 	double Vrange = 20.0;					// Small signal scale range [mV];
 	double scaleHalf = 8388607.0;			// ((2^24)/2)-1;
 	double Wmax = 1000.0;					// Sensor max weight [g];
+//	double Vref = 5.23;						// Voltage reference [V];
 	double Vref = 5.14;						// Voltage reference [V];
 
 	void drive_led(uint8_t status);
 	void drive_led_blink();
-	void begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _Kc, double _Kp);
+	void begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _A, double _Kp);
 	int readInput();
 	void pin_sck_set(uint8_t status);
 	void pin_data_set(uint8_t status);
@@ -110,7 +111,7 @@ private:
 //#define pin_tare_HX711	30
 //#define pin_led			1
 
-void LOADCELL::begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _Kc, double _Kp)
+void LOADCELL::begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _A, double _Kp)
 {
 	gateConfig(pin_data, 0);		// data pin
 	gateConfig(pin_sck, 1);			// sck pin
@@ -120,7 +121,7 @@ void LOADCELL::begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _Kc, dou
 	pin_data_HX711 = pin_data;
 	pin_sck_HX711 = pin_sck;
 
-	Kc = _Kc;
+	A = _A;
 	Kp = _Kp;
 
 //	glcd_init();
@@ -243,7 +244,7 @@ int LOADCELL::get_weight(void)
 {
 	signal = readInput();							// Read the ADC channel;
 	double Vdig = (signal - offset);					// Remove the offset on pure signal;
-	double a = (Kp*Kc*Vrange*Vdig)/scaleHalf;			// Apply equation and obtain the weight in floating point format;
+	double a = (Kp*A*Vrange*Vdig)/scaleHalf;			// Apply equation and obtain the weight in floating point format;
 	int WeightTemp = (int) Waccu*(a*Wmax/Vref);			// Amplifier the value to remove floating point and get an integer number;
 
 
@@ -268,17 +269,25 @@ int LOADCELL::get_weight(void)
 	}
 	else if(abs(error) > 1000 && abs(error) < 2000)
 	{
-		beta = 0.1;
+		beta = 0.08;
 	}
 	else if(abs(error) > 2000 && abs(error) < 3000)
 	{
-		beta = 0.2;
+		beta = 0.08;
 	}
 	else if(abs(error) > 3000 && abs(error) < 5000)
 	{
-		beta = 0.5;
+		beta = 0.08;
 	}
 	else if(abs(error) > 5000 && abs(error) < 10000)
+	{
+		beta = 0.1;
+	}
+	else if(abs(error) > 10000 && abs(error) < 20000)
+	{
+		beta = 0.5;
+	}
+	else if(abs(error) > 20000 && abs(error) < 25000)
 	{
 		beta = 0.8;
 	}
