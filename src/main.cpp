@@ -390,6 +390,7 @@ int main(void)
 //	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
 //	Serial.println("Acionna v2.0");
 //	acn.blink_led(2, 150);
+	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
 	glcd.glcd_init(1);
 
 //	int c = 0;
@@ -405,14 +406,14 @@ int main(void)
 	A[1] = 2.9997;
 	A[2] = 3.0000;
 	A[3] = 3.0017;
-	A[4] = 3.0000;
+	A[4] = 3.0012;
 
 	double Kc[5];
 	Kc[0] = 10*1.3634;
-	Kc[1] = 1.0700;
-	Kc[2] = 1.6985;		// YZC-320 tested on 20170816 with 3.0mV/V and Kc = 1.6985;
-	Kc[3] = 1.0700;	//10.33%
-	Kc[4] = 1.0700;
+	Kc[1] = 1.0872;
+	Kc[2] = 1.6200;	// YZC-320 tested on 20170816 with 3.0mV/V and Kc = 1.6985;
+	Kc[3] = 1.0872;	//10.33%
+	Kc[4] = 1.0872;
 
 	weight1.begin_loadcell(32, 31, A[1], Kc[1]);
 	weight2.begin_loadcell(30, 29, A[2], Kc[2]);
@@ -455,6 +456,15 @@ int main(void)
 					mode = 0;
 					weight1.A = A[1];
 					weight1.Kp = Kc[1];
+
+					weight2.A = A[2];
+					weight2.Kp = Kc[2];
+
+					weight3.A = A[3];
+					weight3.Kp = Kc[3];
+
+					weight4.A = A[4];
+					weight4.Kp = Kc[4];
 				}
 				glcd.glcd_clear2();
 				sprintf(Serial.buffer,"MODE %d", mode);			// 1 digitos;
@@ -479,10 +489,9 @@ int main(void)
 		{
 			acn.flag_1s = 0;
 
-			showResults();
-
-			if(weight3.stable && weight4.stable)
+			if(weight1.stable && weight2.stable && weight3.stable && weight4.stable)
 			{
+				showResults();
 				weight1.drive_led(1);
 			}
 			else
