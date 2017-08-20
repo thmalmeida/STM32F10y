@@ -491,8 +491,8 @@ int main(void)
 
 			if(weight1.stable && weight2.stable && weight3.stable && weight4.stable)
 			{
-				showResults();
 				weight1.drive_led(1);
+				showResults();
 			}
 			else
 			{

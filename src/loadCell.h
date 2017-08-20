@@ -265,7 +265,7 @@ int LOADCELL::get_weight(void)
 	}
 	else if(abs(error) > 500 && abs(error) < 1000)
 	{
-		beta = 0.07;
+		beta = 0.06;
 	}
 	else if(abs(error) > 1000 && abs(error) < 2000)
 	{
