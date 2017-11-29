@@ -53,6 +53,7 @@
 //#define pin_sck_HX711	31
 #define pin_tare_HX711	27
 #define pin_led			1
+#define pin_beep		4
 
 class LOADCELL : ADC, GPIO {
 public:
@@ -87,8 +88,9 @@ public:
 //	double Vref = 5.23;						// Voltage reference [V];
 	double Vref = 5.14;						// Voltage reference [V];
 
-	void drive_led(uint8_t status);
+	void drive_beep(uint8_t beeps, uint8_t timeH, uint8_t timeL);
 	void drive_led_blink();
+	void drive_led(uint8_t status);
 	void begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _A, double _Kp);
 	int readInput();
 	void pin_sck_set(uint8_t status);
@@ -117,6 +119,7 @@ void LOADCELL::begin_loadcell(uint8_t pin_data, uint8_t pin_sck, double _A, doub
 	gateConfig(pin_sck, 1);			// sck pin
 	gateConfig(pin_tare_HX711, 0);	// data pin
 	gateConfig(pin_led, 1);			// led
+	gateConfig(pin_beep, 1);		// beep
 
 	pin_data_HX711 = pin_data;
 	pin_sck_HX711 = pin_sck;
@@ -320,11 +323,12 @@ int LOADCELL::get_weight(void)
 		//	Weight = Wsum/nWeight;
 	}
 
-	if(abs(error) <= 1000)
+	if(abs(error) < 1000)
 	{
 		stable = 1;
 	}
-	else
+
+	if(abs(error) > 10000)
 	{
 		stable = 0;
 	}
@@ -332,6 +336,17 @@ int LOADCELL::get_weight(void)
 	Weight = beta*WeightTemp + Weight - beta*Weight;	// Low Pass Filter
 
 	return Weight;
+}
+void LOADCELL::drive_beep(uint8_t beeps, uint8_t timeH, uint8_t timeL)
+{
+	int i;
+	for(i=0;i<beeps;i++)
+	{
+		gateSet(pin_beep, 1);
+		_delay_ms(timeH);
+		gateSet(pin_beep, 0);
+		_delay_ms(timeL);
+	}
 }
 void LOADCELL::drive_led_blink()
 {

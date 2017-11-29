@@ -29,8 +29,14 @@ NOKIA5110 glcd;
 //uint8_t flag_EXTRF = 0;			// External Reset Flag
 //uint8_t flag_PORF = 0;			// Power-on Reset Flag
 //uint16_t var = 0x0003;
+uint8_t flag_stable = 0;
+int count = 0;
+uint8_t tareOrder = 0;
+double A[5];
+double Kc[5];
 int P[5];
 uint8_t mode = 0;
+
 void showResults()
 {
 	P[0] = P[1]+P[2]+P[3]+P[4];
@@ -38,8 +44,12 @@ void showResults()
 	switch (mode)
 	{
 		case 0:	// kilogram digit only
-			sprintf(Serial.buffer,"%5.1d", P[0]/1000);			// 0 digitos;
-			glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+			if(P[0]>0)
+				sprintf(glcd.buffer,"%5.1d", P[0]/1000+500);			// 0 digitos;
+			else
+				sprintf(glcd.buffer,"%5.1d", P[0]/1000-500);			// 0 digitos;
+
+			glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 			glcd.glcd_put_string(72,5,"kg");					// unit print;
 			break;
 		case 1:	// kilogram digit and decimal floating point
@@ -52,39 +62,39 @@ void showResults()
 					glcd.glcd_Arial16x24_str(52,1,"0");					// 0 digitos;
 				}
 
-				sprintf(Serial.buffer,"%.1d", abs(P[0])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", abs(P[0])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 
 			}
 			else
 			{
-				sprintf(Serial.buffer,"%4.1d", P[0]/1000);				// 0 digitos;
-				glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+				sprintf(glcd.buffer,"%4.1d", P[0]/1000);				// 0 digitos;
+				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 
-				sprintf(Serial.buffer,"%.1d", P[0]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", P[0]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5,"kg");						// unit print;
 			break;
 		case 2:	// All weights with 2 decimal floating point
-			sprintf(Serial.buffer,"Pt: %7.1d.%.2d", P[0]/1000, (P[0]/10)%100);	// 2 digitos;
-			glcd.glcd_put_string(0,1,Serial.buffer);
+			sprintf(glcd.buffer,"Pt: %7.1d.%.2d", P[0]/1000, (P[0]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,1,glcd.buffer);
 
-			sprintf(Serial.buffer,"P1: %7.1d.%.2d", P[1]/1000, abs(P[1]/10)%100);	// 2 digitos;
-			glcd.glcd_put_string(0,2,Serial.buffer);
+			sprintf(glcd.buffer,"P1: %7.1d.%.2d", P[1]/1000, abs(P[1]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,2,glcd.buffer);
 
-			sprintf(Serial.buffer,"P2: %7.1d.%.2d", P[2]/1000, abs(P[2]/10)%100);	// 2 digitos;
-			glcd.glcd_put_string(0,3,Serial.buffer);
+			sprintf(glcd.buffer,"P2: %7.1d.%.2d", P[2]/1000, abs(P[2]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,3,glcd.buffer);
 
-			sprintf(Serial.buffer,"P3: %7.1d.%.2d", P[3]/1000, abs(P[3]/10)%100);	// 2 digitos;
-			glcd.glcd_put_string(0,4,Serial.buffer);
+			sprintf(glcd.buffer,"P3: %7.1d.%.2d", P[3]/1000, abs(P[3]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,4,glcd.buffer);
 
-			sprintf(Serial.buffer,"P4: %7.1d.%.2d", P[4]/1000, abs(P[4]/10)%100);	// 2 digitos;
-			glcd.glcd_put_string(0,5,Serial.buffer);
+			sprintf(glcd.buffer,"P4: %7.1d.%.2d", P[4]/1000, abs(P[4]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,5,glcd.buffer);
 
-			sprintf(Serial.buffer,"s%d", mode);						// mode print;
-			glcd.glcd_put_string(72,0,Serial.buffer);
+			sprintf(glcd.buffer,"s%d", mode);						// mode print;
+			glcd.glcd_put_string(72,0,glcd.buffer);
 			break;
 		case 3:	// Sensor 1 debugging
 		{
@@ -97,29 +107,29 @@ void showResults()
 					glcd.glcd_Arial16x24_str(52,1,"0");				// 0 digitos;
 				}
 
-				sprintf(Serial.buffer,"%.1d", abs(P[1])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", abs(P[1])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 
 			}
 			else
 			{
-				sprintf(Serial.buffer,"%4.1d", P[1]/1000);				// 0 digitos;
-				glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+				sprintf(glcd.buffer,"%4.1d", P[1]/1000);				// 0 digitos;
+				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 
-				sprintf(Serial.buffer,"%.1d", P[1]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", P[1]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5,"kg");						// unit print;
 
-			sprintf(Serial.buffer,"o: %8d", weight1.offset);		// offset show;
-			glcd.glcd_put_string(0,5,Serial.buffer);
+			sprintf(glcd.buffer,"o: %8d", weight1.offset);		// offset show;
+			glcd.glcd_put_string(0,5,glcd.buffer);
 
-			sprintf(Serial.buffer,"s: %8d", weight1.signal);		// signal show;
-			glcd.glcd_put_string(0,0,Serial.buffer);
+			sprintf(glcd.buffer,"s: %8d", weight1.signal);		// signal show;
+			glcd.glcd_put_string(0,0,glcd.buffer);
 
-			sprintf(Serial.buffer,"s%d", 1);						// mode print;
-			glcd.glcd_put_string(72,0,Serial.buffer);
+			sprintf(glcd.buffer,"s%d", 1);						// mode print;
+			glcd.glcd_put_string(72,0,glcd.buffer);
 		}
 		break;
 		case 4:	// Sensor 2 debugging
@@ -133,29 +143,29 @@ void showResults()
 					glcd.glcd_Arial16x24_str(52,1,"0");				// 0 digitos;
 				}
 
-				sprintf(Serial.buffer,"%.1d", abs(P[2])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", abs(P[2])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 
 			}
 			else
 			{
-				sprintf(Serial.buffer,"%4.1d", P[2]/1000);				// 0 digitos;
-				glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+				sprintf(glcd.buffer,"%4.1d", P[2]/1000);				// 0 digitos;
+				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 
-				sprintf(Serial.buffer,"%.1d", P[2]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", P[2]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5,"kg");						// unit print;
 
-			sprintf(Serial.buffer,"o: %8d", weight2.offset);		// offset show;
-			glcd.glcd_put_string(0,5,Serial.buffer);
+			sprintf(glcd.buffer,"o: %8d", weight2.offset);		// offset show;
+			glcd.glcd_put_string(0,5,glcd.buffer);
 
-			sprintf(Serial.buffer,"s: %8d", weight2.signal);		// signal show;
-			glcd.glcd_put_string(0,0,Serial.buffer);
+			sprintf(glcd.buffer,"s: %8d", weight2.signal);		// signal show;
+			glcd.glcd_put_string(0,0,glcd.buffer);
 
-			sprintf(Serial.buffer,"s%d", 2);						// mode print;
-			glcd.glcd_put_string(72,0,Serial.buffer);
+			sprintf(glcd.buffer,"s%d", 2);						// mode print;
+			glcd.glcd_put_string(72,0,glcd.buffer);
 		}
 		break;
 		case 5:	// Sensor 3 debugging
@@ -169,29 +179,29 @@ void showResults()
 					glcd.glcd_Arial16x24_str(52,1,"0");				// 0 digitos;
 				}
 
-				sprintf(Serial.buffer,"%.1d", abs(P[3])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", abs(P[3])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 
 			}
 			else
 			{
-				sprintf(Serial.buffer,"%4.1d", P[3]/1000);				// 0 digitos;
-				glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+				sprintf(glcd.buffer,"%4.1d", P[3]/1000);				// 0 digitos;
+				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 
-				sprintf(Serial.buffer,"%.1d", P[3]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", P[3]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5,"kg");						// unit print;
 
-			sprintf(Serial.buffer,"o: %8d", weight3.offset);		// offset show;
-			glcd.glcd_put_string(0,5,Serial.buffer);
+			sprintf(glcd.buffer,"o: %8d", weight3.offset);		// offset show;
+			glcd.glcd_put_string(0,5,glcd.buffer);
 
-			sprintf(Serial.buffer,"s: %8d", weight3.signal);		// signal show;
-			glcd.glcd_put_string(0,0,Serial.buffer);
+			sprintf(glcd.buffer,"s: %8d", weight3.signal);		// signal show;
+			glcd.glcd_put_string(0,0,glcd.buffer);
 
-			sprintf(Serial.buffer,"s%d", 3);						// mode print;
-			glcd.glcd_put_string(72,0,Serial.buffer);
+			sprintf(glcd.buffer,"s%d", 3);						// mode print;
+			glcd.glcd_put_string(72,0,glcd.buffer);
 		}
 		break;
 		case 6:	// Sensor 4 debugging
@@ -205,29 +215,29 @@ void showResults()
 					glcd.glcd_Arial16x24_str(52,1,"0");				// 0 digitos;
 				}
 
-				sprintf(Serial.buffer,"%.1d", abs(P[4])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", abs(P[4])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 
 			}
 			else
 			{
-				sprintf(Serial.buffer,"%4.1d", P[4]/1000);				// 0 digitos;
-				glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+				sprintf(glcd.buffer,"%4.1d", P[4]/1000);				// 0 digitos;
+				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 
-				sprintf(Serial.buffer,"%.1d", P[4]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", P[4]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5,"kg");						// unit print;
 
-			sprintf(Serial.buffer,"o: %8d", weight4.offset);		// offset show;
-			glcd.glcd_put_string(0,5,Serial.buffer);
+			sprintf(glcd.buffer,"o: %8d", weight4.offset);		// offset show;
+			glcd.glcd_put_string(0,5,glcd.buffer);
 
-			sprintf(Serial.buffer,"s: %8d", weight4.signal);		// signal show;
-			glcd.glcd_put_string(0,0,Serial.buffer);
+			sprintf(glcd.buffer,"s: %8d", weight4.signal);		// signal show;
+			glcd.glcd_put_string(0,0,glcd.buffer);
 
-			sprintf(Serial.buffer,"s%d", 4);						// mode print;
-			glcd.glcd_put_string(72,0,Serial.buffer);
+			sprintf(glcd.buffer,"s%d", 4);						// mode print;
+			glcd.glcd_put_string(72,0,glcd.buffer);
 		}
 		break;
 		case 7: // Small Sensor 1 debugging
@@ -241,26 +251,26 @@ void showResults()
 					glcd.glcd_Arial16x24_str(52,1,"0");				// 0 digitos;
 				}
 
-				sprintf(Serial.buffer,"%.1d", abs(P[1])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", abs(P[1])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 
 			}
 			else
 			{
-				sprintf(Serial.buffer,"%4.1d", P[1]/1000);				// 0 digitos;
-				glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+				sprintf(glcd.buffer,"%4.1d", P[1]/1000);				// 0 digitos;
+				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 
-				sprintf(Serial.buffer,"%.1d", P[1]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
-				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+				sprintf(glcd.buffer,"%.1d", P[1]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
+				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5," g");						// unit print;
 
-			sprintf(Serial.buffer,"o: %8d", weight1.offset);		// offset show;
-			glcd.glcd_put_string(0,5,Serial.buffer);
+			sprintf(glcd.buffer,"o: %8d", weight1.offset);		// offset show;
+			glcd.glcd_put_string(0,5,glcd.buffer);
 
-			sprintf(Serial.buffer,"s: %8d", weight1.signal);		// signal show;
-			glcd.glcd_put_string(0,0,Serial.buffer);
+			sprintf(glcd.buffer,"s: %8d", weight1.signal);		// signal show;
+			glcd.glcd_put_string(0,0,glcd.buffer);
 
 			glcd.glcd_put_string(72,0,"sm");
 		}
@@ -268,24 +278,24 @@ void showResults()
 //		case 6:
 ////			P[0] = P[1]+P[2]+P[3]+P[4];
 //
-//			sprintf(Serial.buffer,"Pt: %7.1d.%.1d", abs(P[0])/1000, abs(P[0])/100%10);			// 1 digitos;
-//			glcd.glcd_put_string(0,1,Serial.buffer);
+//			sprintf(glcd.buffer,"Pt: %7.1d.%.1d", abs(P[0])/1000, abs(P[0])/100%10);			// 1 digitos;
+//			glcd.glcd_put_string(0,1,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"P1: %7.1d.%.1d", abs(P[1])/1000, abs(P[1])/100%10);			// 1 digitos;
-//			glcd.glcd_put_string(0,2,Serial.buffer);
+//			sprintf(glcd.buffer,"P1: %7.1d.%.1d", abs(P[1])/1000, abs(P[1])/100%10);			// 1 digitos;
+//			glcd.glcd_put_string(0,2,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"P2: %7.1d.%.1d", abs(P[2])/1000, abs(P[2])/100%10);			// 1 digitos;
-//			glcd.glcd_put_string(0,3,Serial.buffer);
+//			sprintf(glcd.buffer,"P2: %7.1d.%.1d", abs(P[2])/1000, abs(P[2])/100%10);			// 1 digitos;
+//			glcd.glcd_put_string(0,3,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"P3: %7.1d.%.1d", abs(P[3])/1000, abs(P[3])/100%10);			// 1 digitos;
-//			glcd.glcd_put_string(0,4,Serial.buffer);
+//			sprintf(glcd.buffer,"P3: %7.1d.%.1d", abs(P[3])/1000, abs(P[3])/100%10);			// 1 digitos;
+//			glcd.glcd_put_string(0,4,glcd.buffer);
 //
-//	//		sprintf(Serial.buffer,"P4: %7.1d", P[4]);				// whole digits in GRAMS [g];
-//			sprintf(Serial.buffer,"P4: %7.1d.%.1d", abs(P[4])/1000, abs(P[4])/100%10);			// 1 digitos;
-//			glcd.glcd_put_string(0,5,Serial.buffer);
+//	//		sprintf(glcd.buffer,"P4: %7.1d", P[4]);				// whole digits in GRAMS [g];
+//			sprintf(glcd.buffer,"P4: %7.1d.%.1d", abs(P[4])/1000, abs(P[4])/100%10);			// 1 digitos;
+//			glcd.glcd_put_string(0,5,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"s%d", mode);						// mode print;
-//			glcd.glcd_put_string(72,0,Serial.buffer);
+//			sprintf(glcd.buffer,"s%d", mode);						// mode print;
+//			glcd.glcd_put_string(72,0,glcd.buffer);
 //			break;
 //		case 7: // the whole weight
 ////			P[0] = P[1]+P[2]+P[3]+P[4];
@@ -306,109 +316,89 @@ void showResults()
 //					glcd.glcd_Arial16x24_str(52,1,"0");				// 0 digitos;
 //				}
 //
-//				sprintf(Serial.buffer,"%.1d", abs(P[index])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
-//				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+//				sprintf(glcd.buffer,"%.1d", abs(P[index])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+//				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 //
 //			}
 //			else
 //			{
-//				sprintf(Serial.buffer,"%4.1d", P[index]/1000);		// 0 digitos;
-//				glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+//				sprintf(glcd.buffer,"%4.1d", P[index]/1000);		// 0 digitos;
+//				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 //
-//				sprintf(Serial.buffer,"%.1d", P[index]/100%10);		// 1 digitos; divide by centesimum part and use 10 by 10.
-//				glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+//				sprintf(glcd.buffer,"%.1d", P[index]/100%10);		// 1 digitos; divide by centesimum part and use 10 by 10.
+//				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 //			}
 //			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 //			glcd.glcd_put_string(72,5,"kg");						// unit print;
 //
-//			sprintf(Serial.buffer,"o: %8d", weight1.offset);		// offset show;
-//			glcd.glcd_put_string(0,5,Serial.buffer);
+//			sprintf(glcd.buffer,"o: %8d", weight1.offset);		// offset show;
+//			glcd.glcd_put_string(0,5,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"s: %8d", weight1.signal);		// signal show;
-//			glcd.glcd_put_string(0,0,Serial.buffer);
+//			sprintf(glcd.buffer,"s: %8d", weight1.signal);		// signal show;
+//			glcd.glcd_put_string(0,0,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"s%d", mode);						// mode print;
-//			glcd.glcd_put_string(72,0,Serial.buffer);
+//			sprintf(glcd.buffer,"s%d", mode);						// mode print;
+//			glcd.glcd_put_string(72,0,glcd.buffer);
 //			break;
 //		case 8:
-//			sprintf(Serial.buffer,"%.1d.%.2d   %.1d.%.2d", P[1]/1000, abs(P[1]/10)%100, P[2]/1000, abs(P[2]/10)%100);	// 2 digitos;
-//			glcd.glcd_put_string(0,0,Serial.buffer);
-//			sprintf(Serial.buffer,"%.1d.%.2d   %.1d.%.2d", P[3]/1000, abs(P[3]/10)%100, P[4]/1000, abs(P[4]/10)%100);	// 2 digitos;
-//			glcd.glcd_put_string(0,1,Serial.buffer);
+//			sprintf(glcd.buffer,"%.1d.%.2d   %.1d.%.2d", P[1]/1000, abs(P[1]/10)%100, P[2]/1000, abs(P[2]/10)%100);	// 2 digitos;
+//			glcd.glcd_put_string(0,0,glcd.buffer);
+//			sprintf(glcd.buffer,"%.1d.%.2d   %.1d.%.2d", P[3]/1000, abs(P[3]/10)%100, P[4]/1000, abs(P[4]/10)%100);	// 2 digitos;
+//			glcd.glcd_put_string(0,1,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"%d", weight1.signal);		// signal show;
-//			glcd.glcd_put_string(0,2,Serial.buffer);
-//			sprintf(Serial.buffer,"%d", weight1.offset);		// offset show;
-//			glcd.glcd_put_string(46,2,Serial.buffer);
+//			sprintf(glcd.buffer,"%d", weight1.signal);		// signal show;
+//			glcd.glcd_put_string(0,2,glcd.buffer);
+//			sprintf(glcd.buffer,"%d", weight1.offset);		// offset show;
+//			glcd.glcd_put_string(46,2,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"%d", weight2.signal);		// signal show;
-//			glcd.glcd_put_string(0,3,Serial.buffer);
-//			sprintf(Serial.buffer,"%d", weight2.offset);		// offset show;
-//			glcd.glcd_put_string(46,3,Serial.buffer);
+//			sprintf(glcd.buffer,"%d", weight2.signal);		// signal show;
+//			glcd.glcd_put_string(0,3,glcd.buffer);
+//			sprintf(glcd.buffer,"%d", weight2.offset);		// offset show;
+//			glcd.glcd_put_string(46,3,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"%d", weight3.signal);		// signal show;
-//			glcd.glcd_put_string(0,4,Serial.buffer);
-//			sprintf(Serial.buffer,"%d", weight3.offset);		// offset show;
-//			glcd.glcd_put_string(46,4,Serial.buffer);
+//			sprintf(glcd.buffer,"%d", weight3.signal);		// signal show;
+//			glcd.glcd_put_string(0,4,glcd.buffer);
+//			sprintf(glcd.buffer,"%d", weight3.offset);		// offset show;
+//			glcd.glcd_put_string(46,4,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"%d", weight4.signal);		// signal show;
-//			glcd.glcd_put_string(0,5,Serial.buffer);
-//			sprintf(Serial.buffer,"%d", weight4.offset);		// offset show;
-//			glcd.glcd_put_string(46,5,Serial.buffer);
+//			sprintf(glcd.buffer,"%d", weight4.signal);		// signal show;
+//			glcd.glcd_put_string(0,5,glcd.buffer);
+//			sprintf(glcd.buffer,"%d", weight4.offset);		// offset show;
+//			glcd.glcd_put_string(46,5,glcd.buffer);
 //
-////				sprintf(Serial.buffer,"s%d", mode);						// mode print;
-////				glcd.glcd_put_string(72,0,Serial.buffer);
+////				sprintf(glcd.buffer,"s%d", mode);						// mode print;
+////				glcd.glcd_put_string(72,0,glcd.buffer);
 //			break;
 //		default:
-////				sprintf(Serial.buffer,"%4.1d", abs(P[0])/1000);			// 1 digitos;
-////				sprintf(Serial.buffer,"%3.1d.%.1d", abs(P[mode])/1000, abs(P[mode])/100%10);			// 1 digitos;
-////				sprintf(Serial.buffer,"%3.1d.%.1d", abs(P[mode])/1000, abs(P[mode])/100%10);			// 1 digitos;
+////				sprintf(glcd.buffer,"%4.1d", abs(P[0])/1000);			// 1 digitos;
+////				sprintf(glcd.buffer,"%3.1d.%.1d", abs(P[mode])/1000, abs(P[mode])/100%10);			// 1 digitos;
+////				sprintf(glcd.buffer,"%3.1d.%.1d", abs(P[mode])/1000, abs(P[mode])/100%10);			// 1 digitos;
 //
-////				sprintf(Serial.buffer,"%.1d", abs(P[0])/100%10);		// 1 digitos;
-////				sprintf(Serial.buffer,"%.2d", abs(P[0])/10%100);		// 2 digitos;
-////				sprintf(Serial.buffer,"%.3d", abs(P[0])%1000);			// 3 digitos;
-////				glcd.glcd_big_str(8,2,Serial.buffer);
+////				sprintf(glcd.buffer,"%.1d", abs(P[0])/100%10);		// 1 digitos;
+////				sprintf(glcd.buffer,"%.2d", abs(P[0])/10%100);		// 2 digitos;
+////				sprintf(glcd.buffer,"%.3d", abs(P[0])%1000);			// 3 digitos;
+////				glcd.glcd_big_str(8,2,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"%4.1d", abs(P[mode])/1000);			// 0 digitos;
-//			glcd.glcd_Arial16x24_str(4,1,Serial.buffer);
+//			sprintf(glcd.buffer,"%4.1d", abs(P[mode])/1000);			// 0 digitos;
+//			glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 //			glcd.glcd_dot_print(65,4,3,0x07);
-//			sprintf(Serial.buffer,"%.1d", abs(P[mode])/100%10);		// 1 digitos;
-//			glcd.glcd_Arial16x24_str(68,1,Serial.buffer);
+//			sprintf(glcd.buffer,"%.1d", abs(P[mode])/100%10);		// 1 digitos;
+//			glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 //
-//			sprintf(Serial.buffer,"s%d", mode);
-//			glcd.glcd_put_string(0,0,Serial.buffer);
+//			sprintf(glcd.buffer,"s%d", mode);
+//			glcd.glcd_put_string(0,0,glcd.buffer);
 //			glcd.glcd_put_string(72,5,"kg");
 //		break;
 	}
 }
-
-int main(void)
+void initialize()
 {
-	init();							// uC basic peripherals setup
-
-//	acn.begin_acn();				// Class acionna statement
-//	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
-//	Serial.println("Acionna v2.0");
-//	acn.blink_led(2, 150);
-	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
-	glcd.glcd_init(1);
-
-//	int c = 0;
-//	while(1)
-//	{
-//		sprintf(Serial.buffer, "%d", c);
-//		glcd.glcd_put_string(0,0,Serial.buffer);
-//		c++;
-//	}
-
-	double A[5];
 	A[0] = 1.0000;
 	A[1] = 2.9997;
 	A[2] = 3.0000;
 	A[3] = 3.0017;
 	A[4] = 3.0012;
 
-	double Kc[5];
 	Kc[0] = 10*1.3634;
 	Kc[1] = 1.0872;
 	Kc[2] = 1.6200;	// YZC-320 tested on 20170816 with 3.0mV/V and Kc = 1.6985;
@@ -425,8 +415,65 @@ int main(void)
 	weight3.offset = 11500;
 	weight4.offset = 11500;
 
-	int count = 0;
-	uint8_t tareOrder = 0;
+	if(mode == 7)
+	{
+		weight1.A = A[0];
+		weight1.Kp = Kc[0];
+	}
+	if(mode<7)
+	{
+		weight1.A = A[1];
+		weight1.Kp = Kc[1];
+
+		weight2.A = A[2];
+		weight2.Kp = Kc[2];
+
+		weight3.A = A[3];
+		weight3.Kp = Kc[3];
+
+		weight4.A = A[4];
+		weight4.Kp = Kc[4];
+	}
+
+	// Initializing...
+	glcd.glcd_clear2();
+	weight1.drive_beep(1, 100, 0);
+	strcpy(glcd.buffer, "Inicializando");
+	glcd.glcd_put_string(0,2,glcd.buffer);
+
+	int i;
+	for(i=0;i<50;i++)
+	{
+		P[1] = weight1.get_weight();
+		P[2] = weight2.get_weight();
+		P[3] = weight3.get_weight();
+		P[4] = weight4.get_weight();
+	}
+	glcd.glcd_clear2();
+}
+
+int main(void)
+{
+	init();							// uC basic peripherals setup
+
+//	acn.begin_acn();				// Class acionna statement
+//	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
+//	Serial.println("Acionna v2.0");
+//	acn.blink_led(2, 150);
+	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
+	glcd.glcd_init(1);
+
+//	int c = 0;
+//	while(1)
+//	{
+//		sprintf(glcd.buffer, "%d", c);
+//		glcd.glcd_put_string(0,0,glcd.buffer);
+//		c++;
+//	}
+
+	mode = 0;
+
+	initialize();
 
 	while(1)
 	{
@@ -446,12 +493,13 @@ int main(void)
 				tareOrder = 0;
 				count = 0;
 				mode++;
+				weight1.drive_beep(2, 10, 10);
 				if(mode == 7)
 				{
 					weight1.A = A[0];
 					weight1.Kp = Kc[0];
 				}
-				if(mode>7)
+				if(mode > 7)
 				{
 					mode = 0;
 					weight1.A = A[1];
@@ -467,8 +515,8 @@ int main(void)
 					weight4.Kp = Kc[4];
 				}
 				glcd.glcd_clear2();
-				sprintf(Serial.buffer,"MODE %d", mode);			// 1 digitos;
-				glcd.glcd_put_string(20,2,Serial.buffer);
+				sprintf(glcd.buffer,"MODE %d", mode);			// 1 digitos;
+				glcd.glcd_put_string(20,2,glcd.buffer);
 				while(weight1.readTareButton());
 				glcd.glcd_clear2();
 			}
@@ -483,31 +531,75 @@ int main(void)
 			weight3.tareSystem3();
 			weight4.tareSystem3();
 			glcd.glcd_clear2();
+			weight1.drive_beep(1, 10, 0);
 		}
 
 		if(acn.flag_1s == 1)
 		{
 			acn.flag_1s = 0;
 
-			if(weight1.stable && weight2.stable && weight3.stable && weight4.stable)
+			showResults();
+
+			switch(mode)
 			{
-				weight1.drive_led(1);
-				showResults();
-			}
-			else
-			{
-				weight1.drive_led(0);
+			case 7:
+				if(!weight1.stable)
+				{
+					flag_stable = 0;
+				}
+				if(!flag_stable)
+				{
+					if(weight1.stable)
+					{
+						flag_stable = 1;
+
+						weight1.drive_led(1);
+						if(P[1] > 5000)
+						{
+							weight1.drive_beep(1, 200, 0);
+						}
+					}
+					else
+					{
+						weight1.drive_led(0);
+					}
+				}
+				break;
+			default:
+				if(!weight1.stable || !weight2.stable || !weight3.stable || !weight4.stable)
+				{
+					flag_stable = 0;
+				}
+
+				if(!flag_stable)
+				{
+					if(weight1.stable && weight2.stable && weight3.stable && weight4.stable)
+					{
+						flag_stable = 1;
+
+						weight1.drive_led(1);
+						if(P[0] > 5000)
+						{
+							weight1.drive_beep(1, 200, 0);
+						}
+					}
+					else
+					{
+						weight1.drive_led(0);
+					}
+				}
+				break;
 			}
 		}
-//		sprintf(Serial.buffer,"%4.1d.%.2d", P/(weight.Waccu*10), abs(P%(weight.Waccu))/100);	// 2 digitos
+//		sprintf(glcd.buffer,"%4.1d.%.2d", P/(weight.Waccu*10), abs(P%(weight.Waccu))/100);	// 2 digitos
 
-//		sprintf(Serial.buffer,"P:%.3d.%.3d kg", abs(P/1000), abs(P)%1000);		// 3 digitos;
-//		sprintf(Serial.buffer,"P:%.3d.%.2d kg", abs(P/1000), abs(P/10)%100);	// 2 digitos;
-//		sprintf(Serial.buffer,"%.4d.%.1d", abs(P)/1000, abs(P)/100%10);			// 1 digitos;
-//		glcd.glcd_put_string(0,2,Serial.buffer);
+//		sprintf(glcd.buffer,"P:%.3d.%.3d kg", abs(P/1000), abs(P)%1000);		// 3 digitos;
+//		sprintf(glcd.buffer,"P:%.3d.%.2d kg", abs(P/1000), abs(P/10)%100);	// 2 digitos;
+//		sprintf(glcd.buffer,"%.4d.%.1d", abs(P)/1000, abs(P)/100%10);			// 1 digitos;
+//		glcd.glcd_put_string(0,2,glcd.buffer);
 
-//		sprintf(Serial.buffer,"%4.1d", abs(P[0])/1000);		// kilogram digit;
-//		glcd.glcd_Arial16x24_str(1,1,Serial.buffer);
+//		sprintf(glcd.buffer,"%4.1d", abs(P[0])/1000);		// kilogram digit;
+//		glcd.glcd_Arial16x24_str(1,1,glcd.buffer);
 //		glcd.glcd_dot_print(65,4,3);
 //
 
@@ -544,16 +636,16 @@ int main(void)
 ////
 ////	while(1)
 ////	{
-////		sprintf(Serial.buffer, "a: %c", c++);
-////		Serial.println(Serial.buffer);
+////		sprintf(glcd.buffer, "a: %c", c++);
+////		Serial.println(glcd.buffer);
 ////		_delay_ms(500);
 ////	}
 //
 ////	int c=10;
 ////	while(1)
 ////	{
-////		sprintf(Serial.buffer,"%4.1d g", c);
-////		glcd.glcd_big_str(0,0, Serial.buffer);
+////		sprintf(glcd.buffer,"%4.1d g", c);
+////		glcd.glcd_big_str(0,0, glcd.buffer);
 ////		c++;
 ////		_delay_ms(500);
 ////	}

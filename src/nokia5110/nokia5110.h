@@ -96,6 +96,10 @@
 
 class NOKIA5110 : SPI, public GPIO {
 public:
+
+	static const int bufferSize = 20;
+	char buffer[bufferSize];
+
 	void RCC_Configuration();
 	void GPIO_Configuration();
 	void SPI1_Configuration();
@@ -285,7 +289,6 @@ void NOKIA5110::glcd_init(uint8_t spi_port)//, uint8_t spi_remap)	// spi_port=1 
 	glcd_command(PCD8544_DISPLAYCONTROL | PCD8544_DISPLAYNORMAL);
 
 	glcd_clear2();
-
 //	/* Initialization sequence of controller */
 //	glcd_reset();
 //
