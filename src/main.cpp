@@ -43,11 +43,11 @@ void showResults()
 
 	switch (mode)
 	{
-		case 0:	// kilogram digit only
-			if(P[0]>0)
-				sprintf(glcd.buffer,"%5.1d", P[0]/1000+500);			// 0 digitos;
-			else
-				sprintf(glcd.buffer,"%5.1d", P[0]/1000-500);			// 0 digitos;
+		case 0:	// kilogram digit only. This 500 grams is useful to create a truncated number. If it is (1600+500)/1000=2.1 = 2; else if it is (1499+500)/1000=1.99 = 1
+//			if(P[0]>0)
+				sprintf(glcd.buffer,"%5.1d", (P[0]+500)/1000);			// 0 digitos;
+//			else
+//				sprintf(glcd.buffer,"%5.1d", (P[0]-500)/1000);			// 0 digitos;
 
 			glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 			glcd.glcd_put_string(72,5,"kg");					// unit print;
