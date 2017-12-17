@@ -393,16 +393,16 @@ void showResults()
 }
 void initialize()
 {
-	A[0] = 1.0000;
-	A[1] = 2.9997;
-	A[2] = 3.0000;
-	A[3] = 3.0017;
-	A[4] = 3.0012;
+	A[0] = 1.0000;			// 1kg load bar
+	A[1] = 2.9997;			// s1
+	A[2] = 3.0000;			// s2
+	A[3] = 3.0017;			// s3
+	A[4] = 3.0012;			// s4
 
 	Kc[0] = 10*1.3634;
 	Kc[1] = 1.0872;
-	Kc[2] = 1.6200;	// YZC-320 tested on 20170816 with 3.0mV/V and Kc = 1.6985;
-	Kc[3] = 1.0872;	//10.33%
+	Kc[2] = 1.6200;			// YZC-320 tested on 20170816 with 3.0mV/V and Kc = 1.6985;
+	Kc[3] = 1.0872;			//10.33%
 	Kc[4] = 1.0872;
 
 	weight1.begin_loadcell(32, 31, A[1], Kc[1]);
@@ -410,10 +410,10 @@ void initialize()
 	weight3.begin_loadcell(19, 18, A[3], Kc[3]);
 	weight4.begin_loadcell(17, 16, A[4], Kc[4]);
 
-	weight1.offset = 11500;
-	weight2.offset = 5000;
-	weight3.offset = 11500;
-	weight4.offset = 11500;
+	weight1.offset = 11500;	// s1
+	weight2.offset = 5000;	// s2
+	weight3.offset = 11500; // s3
+	weight4.offset = 11500;	// s4
 
 	if(mode == 7)
 	{
@@ -440,6 +440,9 @@ void initialize()
 	weight1.drive_beep(1, 100, 0);
 	strcpy(glcd.buffer, "Inicializando");
 	glcd.glcd_put_string(0,2,glcd.buffer);
+
+	strcpy(glcd.buffer, "thmalmeida SYS");
+	glcd.glcd_put_string(0,6,glcd.buffer);
 
 	int i;
 	for(i=0;i<50;i++)
@@ -515,7 +518,7 @@ int main(void)
 					weight4.Kp = Kc[4];
 				}
 				glcd.glcd_clear2();
-				sprintf(glcd.buffer,"MODE %d", mode);			// 1 digitos;
+				sprintf(glcd.buffer,"MODE %d", mode);			// 1 digito;
 				glcd.glcd_put_string(20,2,glcd.buffer);
 				while(weight1.readTareButton());
 				glcd.glcd_clear2();

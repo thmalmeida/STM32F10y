@@ -58,9 +58,12 @@
 class LOADCELL : ADC, GPIO {
 public:
 
+	static const int nWeight = 50;			// number of samples to count into average summation;
+	static const int stabWeight = 450;		//
+	static const int unstWeight = 10000;	//
+
 	uint8_t pin_data_HX711;
 	uint8_t pin_sck_HX711;
-
 
 	uint8_t stable = 0;
 
@@ -69,8 +72,6 @@ public:
 	int Weight = 0;							// currently weight x10;
 
 	int P;									// currently weight found;
-
-	static const int nWeight = 50;			// number of samples to count into average summation;
 
 	int WeightVect[nWeight];				// vector of weights calculated;
 	int signalVect[nWeight];				// digital values obtained from HX711 24 bits;
@@ -323,12 +324,12 @@ int LOADCELL::get_weight(void)
 		//	Weight = Wsum/nWeight;
 	}
 
-	if(abs(error) < 1000)
+	if(abs(error) < stabWeight)	// If weight found is less then stabWeight we take stable weight
 	{
 		stable = 1;
 	}
 
-	if(abs(error) > 10000)
+	if(abs(error) > unstWeight) // else, if goes bigger than unstWeight we don't have the weight yet
 	{
 		stable = 0;
 	}
