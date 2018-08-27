@@ -59,8 +59,13 @@ class LOADCELL : ADC, GPIO {
 public:
 
 	static const int nWeight = 50;			// number of samples to count into average summation;
-	static const int stabWeight = 450;		//
-	static const int unstWeight = 10000;	//
+	int stabWeight = 501;		//
+	int unstWeight = 25000;	//
+
+	const double betaV[2][11] = {{0.01, 0.02, 0.03, 0.04, 0.07, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0},
+								 {0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.1, 0.2, 0.3}};
+
+	int WeightIndex = 0;
 
 	uint8_t pin_data_HX711;
 	uint8_t pin_sck_HX711;
@@ -72,10 +77,12 @@ public:
 	int Weight = 0;							// currently weight x10;
 
 	int P;									// currently weight found;
+	int convCount;							// counter to fast convergence find;
 
 	int WeightVect[nWeight];				// vector of weights calculated;
 	int signalVect[nWeight];				// digital values obtained from HX711 24 bits;
 	int signal;
+	int error;
 
 	double beta = 0.05;
 	static const int Waccu = 100;			//
@@ -246,58 +253,58 @@ int LOADCELL::readTareButton()
 }
 int LOADCELL::get_weight(void)
 {
-	signal = readInput();							// Read the ADC channel;
-	double Vdig = (signal - offset);					// Remove the offset on pure signal;
-	double a = (Kp*A*Vrange*Vdig)/scaleHalf;			// Apply equation and obtain the weight in floating point format;
-	int WeightTemp = (int) Waccu*(a*Wmax/Vref);			// Amplifier the value to remove floating point and get an integer number;
+	signal = readInput();						// Read the ADC channel;
+	double Vdig = (signal - offset);			// Remove the offset on pure signal;
+	double a = (Kp*A*Vrange*Vdig)/scaleHalf;	// Apply equation and obtain the weight in floating point format;
+	int WeightTemp = (int) Waccu*(a*Wmax/Vref);	// Amplifier the value to remove floating point and get an integer number;
 
 
 
-	int error = WeightTemp - Weight;					// This process accelerate to the outcome convergence;
+	error = WeightTemp - Weight;				// This process accelerate to the outcome convergence;
 
 	if(abs(error) < 100)
 	{
-		beta = 0.01;
+		beta = betaV[WeightIndex][0];
 	}
 	else if(abs(error) < 200)
 	{
-		beta = 0.02;
+		beta = betaV[WeightIndex][1];
 	}
 	else if(abs(error) < 500)
 	{
-		beta = 0.03;
+		beta = betaV[WeightIndex][2];
 	}
 	else if(abs(error) > 500 && abs(error) < 1000)
 	{
-		beta = 0.06;
+		beta = betaV[WeightIndex][3];
 	}
 	else if(abs(error) > 1000 && abs(error) < 2000)
 	{
-		beta = 0.08;
+		beta = betaV[WeightIndex][4];
 	}
 	else if(abs(error) > 2000 && abs(error) < 3000)
 	{
-		beta = 0.08;
+		beta = betaV[WeightIndex][5];
 	}
 	else if(abs(error) > 3000 && abs(error) < 5000)
 	{
-		beta = 0.08;
+		beta = betaV[WeightIndex][6];
 	}
 	else if(abs(error) > 5000 && abs(error) < 10000)
 	{
-		beta = 0.1;
+		beta = betaV[WeightIndex][7];
 	}
 	else if(abs(error) > 10000 && abs(error) < 20000)
 	{
-		beta = 0.5;
+		beta = betaV[WeightIndex][8];
 	}
 	else if(abs(error) > 20000 && abs(error) < 25000)
 	{
-		beta = 0.8;
+		beta = betaV[WeightIndex][9];
 	}
 	else
 	{
-		beta = 1.0;
+		beta = betaV[WeightIndex][9];		// suppose to beta = 1.00;
 	}
 
 	if(beta == 1.0)
@@ -324,14 +331,20 @@ int LOADCELL::get_weight(void)
 		//	Weight = Wsum/nWeight;
 	}
 
-	if(abs(error) < stabWeight)	// If weight found is less then stabWeight we take stable weight
+	if(abs(error) < 1000)	// If weight found is less then stabWeight we take stable weight
 	{
 		stable = 1;
+		WeightIndex = 1;
 	}
-
-	if(abs(error) > unstWeight) // else, if goes bigger than unstWeight we don't have the weight yet
+	else if((abs(error) > 20000) && stable == 1) // else, if goes bigger than unstWeight we don't have the weight yet
 	{
-		stable = 0;
+//		convCount++;
+//		if(convCount > 500)
+//		{
+//			convCount = 0;
+			stable = 0;
+			WeightIndex = 0;
+//		}
 	}
 
 	Weight = beta*WeightTemp + Weight - beta*Weight;	// Low Pass Filter

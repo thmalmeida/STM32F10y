@@ -9,6 +9,7 @@
 #include <stm32f10x_rtc.h>
 #include "stm32f10x_it.h"
 #include "Hardware/adc.h"
+#include "Hardware/gpio.h"
 
 #include "nokia5110/nokia5110.h"
 #include "nokia5110/fonts/fonts.h"
@@ -29,14 +30,86 @@ NOKIA5110 glcd;
 //uint8_t flag_EXTRF = 0;			// External Reset Flag
 //uint8_t flag_PORF = 0;			// Power-on Reset Flag
 //uint16_t var = 0x0003;
+
+
 uint8_t flag_stable = 0;
 int count = 0;
 uint8_t tareOrder = 0;
 double A[5];
 double Kc[5];
 int P[5];
-uint8_t mode = 0;
+uint8_t mode = 0; 			// state machine begins from standard mode 0
 
+void test1()
+{
+	GPIO pinos;
+
+	pinos.gateConfig(1, 1);
+	pinos.gateConfig(5, 1);
+	pinos.gateConfig(6, 1);
+	pinos.gateConfig(7, 1);
+	pinos.gateConfig(8, 1);
+
+
+	while(1)
+	{
+		pinos.gateToggle(1);
+		pinos.gateToggle(5);
+		pinos.gateToggle(6);
+		pinos.gateToggle(7);
+		pinos.gateToggle(8);
+		_delay_ms(1000);
+	}
+}
+void test2()
+{
+	GPIO pinos;
+	pinos.gateConfig(1,1);
+	pinos.gateConfig(6,0);
+	pinos.gateConfig(7,0);
+
+	int a = 0, b = 0;
+	while(1)
+	{
+		a = pinos.gateRead(6, 0);
+		b = pinos.gateRead(7, 0);
+		if(a || b)
+			pinos.gateSet(1,1);
+		else
+			pinos.gateSet(1,0);
+	}
+}
+
+// ----- Weight System -----
+void sensor_test()
+{	// Function to test sensor by sensor before to fly
+	int i;
+	int V[5];
+
+	glcd.glcd_clear2();
+
+	for(i=0;i<20;i++)
+	{
+		V[1] = weight1.readInput();
+		sprintf(glcd.buffer,"%9.9d", V[1]);
+		glcd.glcd_put_string(0,1,glcd.buffer);
+
+		V[2] = weight2.readInput();
+		sprintf(glcd.buffer,"%9.9d", V[2]);
+		glcd.glcd_put_string(0,2,glcd.buffer);
+
+		V[3] = weight3.readInput();
+		sprintf(glcd.buffer,"%9.9d", V[3]);
+		glcd.glcd_put_string(0,3,glcd.buffer);
+
+		V[4] = weight4.readInput();
+		sprintf(glcd.buffer,"%9.9d", V[4]);
+		glcd.glcd_put_string(0,4,glcd.buffer);
+
+		_delay_ms(500);
+	}
+
+}
 void showResults()
 {
 	P[0] = P[1]+P[2]+P[3]+P[4];
@@ -44,6 +117,7 @@ void showResults()
 	switch (mode)
 	{
 		case 0:	// kilogram digit only. This 500 grams is useful to create a truncated number. If it is (1600+500)/1000=2.1 = 2; else if it is (1499+500)/1000=1.99 = 1
+		{
 //			if(P[0]>0)
 				sprintf(glcd.buffer,"%5.1d", (P[0]+500)/1000);			// 0 digitos;
 //			else
@@ -51,8 +125,12 @@ void showResults()
 
 			glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 			glcd.glcd_put_string(72,5,"kg");					// unit print;
-			break;
+			sprintf(glcd.buffer,"e:%8.1d",weight3.error);
+			glcd.glcd_put_string(0,5,glcd.buffer);
+		}
+		break;
 		case 1:	// kilogram digit and decimal floating point
+		{
 			if(P[0]/100%10 < 0)
 			{
 				if((P[0]/1000) == 0)
@@ -76,8 +154,10 @@ void showResults()
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5,"kg");						// unit print;
-			break;
+		}
+		break;
 		case 2:	// All weights with 2 decimal floating point
+		{
 			sprintf(glcd.buffer,"Pt: %7.1d.%.2d", P[0]/1000, (P[0]/10)%100);	// 2 digitos;
 			glcd.glcd_put_string(0,1,glcd.buffer);
 
@@ -95,7 +175,8 @@ void showResults()
 
 			sprintf(glcd.buffer,"s%d", mode);						// mode print;
 			glcd.glcd_put_string(72,0,glcd.buffer);
-			break;
+		}
+		break;
 		case 3:	// Sensor 1 debugging
 		{
 			if(P[1]/100%10 < 0)
@@ -242,39 +323,60 @@ void showResults()
 		break;
 		case 7: // Small Sensor 1 debugging
 		{
-			if(P[1]/100%10 < 0)
+			if(P[4]/100%10 < 0)
 			{
-				if((P[1]/1000) == 0)
+				if((P[4]/1000) == 0)
 				{
 					glcd.glcd_dot_print(35,2,9,0xC0);					// minus signal;
 					glcd.glcd_dot_print(35,3,9,0x01);					// minus signal;
 					glcd.glcd_Arial16x24_str(52,1,"0");				// 0 digitos;
 				}
 
-				sprintf(glcd.buffer,"%.1d", abs(P[1])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
+				sprintf(glcd.buffer,"%.1d", abs(P[4])/100%10);	// 1 digitos; divide by centesimum part and use 10 by 10.
 				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 
 			}
 			else
 			{
-				sprintf(glcd.buffer,"%4.1d", P[1]/1000);				// 0 digitos;
+				sprintf(glcd.buffer,"%4.1d", P[4]/1000);				// 0 digitos;
 				glcd.glcd_Arial16x24_str(4,1,glcd.buffer);
 
-				sprintf(glcd.buffer,"%.1d", P[1]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
+				sprintf(glcd.buffer,"%.1d", P[4]/100%10);			// 1 digitos; divide by centesimum part and use 10 by 10.
 				glcd.glcd_Arial16x24_str(68,1,glcd.buffer);
 			}
 			glcd.glcd_dot_print(65,4,3,0x07);						// dot digit;
 			glcd.glcd_put_string(72,5," g");						// unit print;
 
-			sprintf(glcd.buffer,"o: %8d", weight1.offset);		// offset show;
+			sprintf(glcd.buffer,"o: %8d", weight4.offset);		// offset show;
 			glcd.glcd_put_string(0,5,glcd.buffer);
 
-			sprintf(glcd.buffer,"s: %8d", weight1.signal);		// signal show;
+
+			sprintf(glcd.buffer,"s: %8d", weight4.signal);		// signal show;
 			glcd.glcd_put_string(0,0,glcd.buffer);
+
+//			sprintf(glcd.buffer,"p: %8d", P[1]);		// signal show;
+//			glcd.glcd_put_string(0,0,glcd.buffer);
 
 			glcd.glcd_put_string(72,0,"sm");
 		}
-			break;
+		break;
+		case 8:	// All weights with 2 decimal floating point
+		{
+			sprintf(glcd.buffer,"P1: %7.1d.%.2d", P[1]/1000, abs(P[1]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,2,glcd.buffer);
+
+			sprintf(glcd.buffer,"P2: %7.1d.%.2d", P[2]/1000, abs(P[2]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,3,glcd.buffer);
+
+			sprintf(glcd.buffer,"P3: %7.1d.%.2d", P[3]/1000, abs(P[3]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,4,glcd.buffer);
+
+			sprintf(glcd.buffer,"P4: %7.1d.%.2d", P[4]/1000, abs(P[4]/10)%100);	// 2 digitos;
+			glcd.glcd_put_string(0,5,glcd.buffer);
+
+			sprintf(glcd.buffer,"s%d", mode);						// mode print;
+			glcd.glcd_put_string(72,0,glcd.buffer);
+		}
 //		case 6:
 ////			P[0] = P[1]+P[2]+P[3]+P[4];
 //
@@ -393,32 +495,56 @@ void showResults()
 }
 void initialize()
 {
-	A[0] = 1.0000;			// 1kg load bar
+	/*
+	 * Initial weight of cattle contention by foot
+	 *
+	 * P1:  420.41 kg
+	 * P2:  340.86 kg
+	 * P3:  401.14 kg
+	 * P4:  360.24 kg
+	 * Pt: 1522.65 kg
+	 */
+
+	init();					// uC basic peripherals setup
+	acn.begin_acn();		// Class acionna statement
+	glcd.glcd_init(1);		// nokia 5110 graphic lcd init
+
+
+	A[0] = 1.0000;			// 1kg load bar (small load cell sensor)
 	A[1] = 2.9997;			// s1
 	A[2] = 3.0000;			// s2
 	A[3] = 3.0017;			// s3
 	A[4] = 3.0012;			// s4
 
-	Kc[0] = 10*1.3634;
+	Kc[0] = 10*1.3629;		// proportional constant of small 1kg load bar sensor
 	Kc[1] = 1.0872;
 	Kc[2] = 1.6200;			// YZC-320 tested on 20170816 with 3.0mV/V and Kc = 1.6985;
 	Kc[3] = 1.0872;			//10.33%
 	Kc[4] = 1.0872;
-
-	weight1.begin_loadcell(32, 31, A[1], Kc[1]);
-	weight2.begin_loadcell(30, 29, A[2], Kc[2]);
-	weight3.begin_loadcell(19, 18, A[3], Kc[3]);
-	weight4.begin_loadcell(17, 16, A[4], Kc[4]);
 
 	weight1.offset = 11500;	// s1
 	weight2.offset = 5000;	// s2
 	weight3.offset = 11500; // s3
 	weight4.offset = 11500;	// s4
 
-	if(mode == 7)
+	weight1.begin_loadcell( 7,  6, A[1], Kc[1]);
+	weight2.begin_loadcell(32, 31, A[2], Kc[2]);
+	weight3.begin_loadcell(19, 18, A[3], Kc[3]);
+	weight4.begin_loadcell(17, 16, A[4], Kc[4]);
+
+	if(mode >= 7)
 	{
 		weight1.A = A[0];
 		weight1.Kp = Kc[0];
+
+		weight2.A = A[0];
+		weight2.Kp = Kc[0];
+
+		weight3.A = A[0];
+		weight3.Kp = Kc[0];
+
+		weight4.A = A[0];
+		weight4.Kp = Kc[0];
 	}
 	if(mode<7)
 	{
@@ -439,43 +565,45 @@ void initialize()
 	glcd.glcd_clear2();
 	weight1.drive_beep(1, 100, 0);
 	strcpy(glcd.buffer, "Inicializando");
-	glcd.glcd_put_string(0,2,glcd.buffer);
+	glcd.glcd_put_string(0,0,glcd.buffer);
 
 	strcpy(glcd.buffer, "thmalmeida SYS");
-	glcd.glcd_put_string(0,6,glcd.buffer);
+	glcd.glcd_put_string(0,2,glcd.buffer);
 
-	int i;
-	for(i=0;i<50;i++)
-	{
-		P[1] = weight1.get_weight();
-		P[2] = weight2.get_weight();
-		P[3] = weight3.get_weight();
-		P[4] = weight4.get_weight();
-	}
-	glcd.glcd_clear2();
-}
-
-int main(void)
-{
-	init();							// uC basic peripherals setup
-
-//	acn.begin_acn();				// Class acionna statement
-//	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
-//	Serial.println("Acionna v2.0");
-//	acn.blink_led(2, 150);
-	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
-	glcd.glcd_init(1);
-
-//	int c = 0;
-//	while(1)
+	sensor_test();
+	// Function to test sensor by sensor before to fly
+//	int i;
+//	for(i=1;i<=4;i++)
 //	{
-//		sprintf(glcd.buffer, "%d", c);
-//		glcd.glcd_put_string(0,0,glcd.buffer);
-//		c++;
+//		strcpy(glcd.buffer, "Sensor 1...");
+//		glcd.glcd_put_string(0,3,glcd.buffer);
+//		P[1] = weight1.get_weight();
+//
 //	}
 
-	mode = 0;
 
+
+	// This process find the initial weight. 50 iteraction suppose to be a good try
+//	for(i=0;i<50;i++)
+//	{
+//		P[1] = weight1.get_weight();
+//		P[2] = weight2.get_weight();
+//		P[3] = weight3.get_weight();
+//		P[4] = weight4.get_weight();
+//	}
+	glcd.glcd_clear2();
+}
+void weight_process()
+{
+	//	int c = 0;
+	//	while(1)
+	//	{
+	//		sprintf(glcd.buffer, "%d", c);
+	//		glcd.glcd_put_string(0,0,glcd.buffer);
+	//		c++;
+	//	}
+
+//	test2();
 	initialize();
 
 	while(1)
@@ -501,8 +629,17 @@ int main(void)
 				{
 					weight1.A = A[0];
 					weight1.Kp = Kc[0];
+
+					weight2.A = A[0];
+					weight2.Kp = Kc[0];
+
+					weight3.A = A[0];
+					weight3.Kp = Kc[0];
+
+					weight4.A = A[0];
+					weight4.Kp = Kc[0];
 				}
-				if(mode > 7)
+				if(mode > 8)
 				{
 					mode = 0;
 					weight1.A = A[1];
@@ -537,41 +674,43 @@ int main(void)
 			weight1.drive_beep(1, 10, 0);
 		}
 
-		if(acn.flag_1s == 1)
+		if(acn.flag_1s == 1)			// in each 1 second interval, print the weight
 		{
 			acn.flag_1s = 0;
 
-			showResults();
+			showResults();				// Show results on screen
 
-			switch(mode)
+			switch(mode)				// This is
 			{
 			case 7:
-				if(!weight1.stable)
+				if(!weight4.stable) 	// if not stable, clear stable flag.
 				{
 					flag_stable = 0;
 				}
-				if(!flag_stable)
+				if(!flag_stable)		// if not stable, join here
 				{
-					if(weight1.stable)
+					if(weight4.stable)	// if become stable and has some weight, beep it!
 					{
 						flag_stable = 1;
-
-						weight1.drive_led(1);
+						glcd.glcd_hash_print(0,1);
 						if(P[1] > 5000)
 						{
-							weight1.drive_beep(1, 200, 0);
+							weight4.drive_led(1);
+							weight4.drive_beep(1, 200, 0);
 						}
 					}
 					else
 					{
-						weight1.drive_led(0);
+						weight4.drive_led(0);
+						glcd.glcd_space_print(0,1);	// clear the hash.
 					}
 				}
 				break;
 			default:
-				if(!weight1.stable || !weight2.stable || !weight3.stable || !weight4.stable)
+				if(!weight1.stable || !weight2.stable || !weight3.stable || !weight4.stable) 	// if at least one sensor is not stable, then...
 				{
 					flag_stable = 0;
+					glcd.glcd_space_print(0,0);	// clear the hash.
 				}
 
 				if(!flag_stable)
@@ -580,10 +719,11 @@ int main(void)
 					{
 						flag_stable = 1;
 
-						weight1.drive_led(1);
-						if(P[0] > 5000)
+						if(P[0] > 8000)
 						{
 							weight1.drive_beep(1, 200, 0);
+							glcd.glcd_hash_print(0,0);
+							weight1.drive_led(1);
 						}
 					}
 					else
@@ -624,6 +764,70 @@ int main(void)
 //		}
 	}
 }
+
+// ----- Water System Machine ----- //
+void waterSystem_process()		//
+{
+	init();							// uC basic peripherals setup
+
+	acn.begin_acn();				// Class acionna statement
+	Serial.begin(38400);				// Initialize USART1 @ 9600 baud
+	Serial.println("Acionna v2.0");
+	acn.blink_led(2, 150);
+	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
+
+
+	// the main process comes here!
+	while(1)
+	{
+		acn.comm_Bluetooth();
+
+		acn.refreshVariables();
+
+		acn.handleMessage();
+
+		acn.process_Mode();
+	}
+}
+
+int main(void)
+{
+//	acn.begin_acn();				// Class acionna statement
+//	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
+//	Serial.println("Acionna v2.0");
+//	acn.blink_led(2, 150);
+//	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
+
+
+//	waterSystem_process();
+	weight_process();
+
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //int main(void)
 //{

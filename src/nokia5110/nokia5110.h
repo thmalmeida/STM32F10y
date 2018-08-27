@@ -124,6 +124,8 @@ public:
 	void glcd_PCD8544_init(void);
 	void glcd_example();
 	void glcd_dot_print(uint8_t x, uint8_t y, uint8_t size, uint8_t value);
+	void glcd_space_print(uint8_t x, uint8_t y);
+	void glcd_hash_print(uint8_t x, uint8_t y);
 	void glcd_Arial16x24_str(uint8_t x, uint8_t y, char const *str);
 	void glcd_big_str(uint8_t x, uint8_t y, char const *str);
 
@@ -480,6 +482,28 @@ void NOKIA5110::glcd_dot_print(uint8_t x, uint8_t y, uint8_t size, uint8_t value
 		glcd_data(value);	// square dot
 	}
 	glcd_data(0x00);		// little space after dot
+}
+void NOKIA5110::glcd_space_print(uint8_t x, uint8_t y)
+{
+	glcd_set_x_address(x);
+	glcd_set_y_address(y);
+
+	glcd_data(0x00);					// print some 1x8 vertical blank space;
+	for(int i=0;i<5;i++)					// this font has 5 cols length of 1 byte each;
+	{
+		glcd_data(0x00);
+	}
+}
+void NOKIA5110::glcd_hash_print(uint8_t x, uint8_t y)
+{
+	glcd_set_x_address(x);
+	glcd_set_y_address(y);
+
+	glcd_data(0x00);					// print some 1x8 vertical blank space;
+	for(int i=0;i<5;i++)					// this font has 5 cols length of 1 byte each;
+	{
+		glcd_data(0xFF);
+	}
 }
 void NOKIA5110::glcd_Arial16x24_str(uint8_t x, uint8_t y, char const *str)
 {

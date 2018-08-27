@@ -520,6 +520,38 @@ void GPIO::gateToggle(uint8_t pin)
 			GPIOC -> ODR ^= (1<<15);
 			break;
 
+		case 4:
+			GPIOA -> ODR ^= (1<<0);
+			break;
+
+		case 5:
+			GPIOA -> ODR ^= (1<<1);
+			break;
+
+		case 6:
+			GPIOA -> ODR ^= (1<<2);
+			break;
+
+		case 7:
+			GPIOA -> ODR ^= (1<<3);
+			break;
+
+		case 8:
+			GPIOA -> ODR ^= (1<<4);
+			break;
+
+		case 9:
+			GPIOA -> ODR ^= (1<<5);
+			break;
+
+		case 10:
+			GPIOA -> ODR ^= (1<<6);
+			break;
+
+		case 11:
+			GPIOA -> ODR ^= (1<<7);
+			break;
+
 		case 30:
 			GPIOB -> ODR ^= (1<<7);
 			break;
@@ -560,6 +592,27 @@ uint8_t GPIO::gateRead(uint8_t pin, uint8_t reg)	// reg: read register input IDR
 				status = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_0);
 			else
 				status = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
+			break;
+
+		case 5:
+			if(reg)
+				status = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_1);
+			else
+				status = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_1);
+			break;
+
+		case 6:
+			if(reg)
+				status = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_2);
+			else
+				status = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_2);
+			break;
+
+		case 7:
+			if(reg)
+				status = GPIO_ReadOutputDataBit(GPIOA, GPIO_Pin_3);
+			else
+				status = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_3);
 			break;
 
 		case 16:
