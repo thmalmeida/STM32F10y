@@ -771,11 +771,9 @@ void waterSystem_process()		//
 	init();							// uC basic peripherals setup
 
 	acn.begin_acn();				// Class acionna statement
-	Serial.begin(38400);				// Initialize USART1 @ 9600 baud
-	Serial.println("Acionna v2.0");
 	acn.blink_led(2, 150);
-	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
-
+	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
+	Serial.println("Acionna v2.1");
 
 	// the main process comes here!
 	while(1)
@@ -787,20 +785,18 @@ void waterSystem_process()		//
 		acn.handleMessage();
 
 		acn.process_Mode();
+
+//		acn.drive_led_toggle();
 	}
 }
 
 int main(void)
 {
-//	acn.begin_acn();				// Class acionna statement
-//	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
-//	Serial.println("Acionna v2.0");
-//	acn.blink_led(2, 150);
-//	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
+	waterSystem_process();
 
+//	or
 
-//	waterSystem_process();
-	weight_process();
+//	weight_process();
 
 	return 0;
 }

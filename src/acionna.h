@@ -65,7 +65,7 @@
 #define pin_analog_HL 4
 
 
-#define startTypeK	1		// 1-Partida direta: monofásico; 2-Partida direta: trifásico; 3-Partida estrela/triangulo
+#define startTypeK	1		// 1-Partida direta: monofï¿½sico; 2-Partida direta: trifï¿½sico; 3-Partida estrela/triangulo
 
 enum states01 {
 	redTime,
@@ -222,15 +222,15 @@ private:
 void ACIONNA::begin_acn()
 {
 	gateConfig(pin_out_led, 1);		// Configure pin led as output;
-	drive_led_off();
+//	drive_led_on();
 	gateConfig(pin_out_k1, 1);
-	gateConfig(pin_out_k2, 1);
-	gateConfig(pin_out_k3, 1);
-
+//	gateConfig(pin_out_k2, 1);
+//	gateConfig(pin_out_k3, 1);
+//
 	gateConfig(pin_in_k1, 0);
-	gateConfig(pin_in_k3, 0);
+//	gateConfig(pin_in_k3, 0);
 	gateConfig(pin_in_Rth, 0);
-
+//
 	adc_begin();
 	eeprom.begin_eeprom();
 	refreshStoredData();
@@ -376,11 +376,11 @@ void ACIONNA::driveMotor_ON(uint8_t startType)
 {
 	switch (startType)
 	{
-		case 1:	// Partida direta: monofásico
+		case 1:	// Partida direta: monofï¿½sico
 			k1_on();
 			break;
 
-		case 2: // Partida direta: trifásico
+		case 2: // Partida direta: trifï¿½sico
 			k1_on();
 			k2_on();
 			break;
@@ -453,7 +453,7 @@ double ACIONNA::get_Pressure()
     Working pressure range: 0 to  1.2 MPa
     Maxi pressure: 2.4 MPa
     Working temperature range: 0 to 100 graus C
-    Accuracy: ± 1.0%
+    Accuracy: ï¿½ 1.0%
     Response time: <= 2.0 ms
     Package include: 1 pc pressure sensor
     Wires : Red---Power (+5V)  Black---Power (0V) - blue ---Pulse singal output
@@ -1107,9 +1107,9 @@ void ACIONNA::refreshVariables()
 		check_timeMatch();		// time matches flag;
 		check_TimerVar();		// drive timers
 
-		check_pressure();		// get and check pressure system;
+//		check_pressure();		// get and check pressure system;
 //		check_thermalSafe();	// thermal relay check;
-		check_levelSensors();	// level sensors;
+//		check_levelSensors();	// level sensors;
 
 //		check_pressureDown();
 
@@ -1133,15 +1133,19 @@ void ACIONNA::refreshStoredData()
 	{
 		stateMode = 0;
 		eeprom.write(eeprom.pageSet, eeprom.addr_stateMode, stateMode);
-		eeprom.write(eeprom.pageSet, eeprom.addr_standBy_min, 0);
 		eeprom.write(eeprom.pageSet, eeprom.addr_LevelRef, 1023);
-		eeprom.write(eeprom.pageSet, eeprom.addr_motorTimerE, 60);
+		eeprom.write(eeprom.pageSet, eeprom.addr_standBy_min, 0);
 		eeprom.write(eeprom.pageSet, eeprom.addr_PRessureRef, 60);
 		eeprom.write(eeprom.pageSet, eeprom.addr_PRessureRef_Valve, 40);
-		eeprom.write(eeprom.pageSet, eeprom.addr_PRessurePer, 85);
-		eeprom.write(eeprom.pageSet, eeprom.addr_nTM, 1);
+		eeprom.write(eeprom.pageSet, eeprom.addr_PRessureMax_Sensor, 100);
+		eeprom.write(eeprom.pageSet, eeprom.addr_motorTimerE, 60);
 		eeprom.write(eeprom.pageSet, eeprom.addr_HourOnTM, 21);
 		eeprom.write(eeprom.pageSet, eeprom.addr_MinOnTM, 40);
+		eeprom.write(eeprom.pageSet, eeprom.addr_nTM, 1);
+		eeprom.write(eeprom.pageSet, eeprom.addr_standBy_min, 10);
+
+
+		eeprom.write(eeprom.pageSet, eeprom.addr_PRessurePer, 85);
 		eeprom.write(eeprom.pageSet, eeprom.addr_rtc_PRL, 40000);
 		eeprom.write(eeprom.pageSet, eeprom.addr_rtc_clkSource, 0);
 
@@ -1184,21 +1188,21 @@ void ACIONNA::handleMessage()
 /*
 $0X;				Verificar detalhes - Detalhes simples (tempo).
 	$00;			- Detalhes simples (tempo).
-	$01;			- Verifica histórico de quando ligou e desligou;
+	$01;			- Verifica histï¿½rico de quando ligou e desligou;
 	$02;			- Mostra tempo que falta para ligar;
 		$02:c;		- Zera o tempo;
 		$02:c:30;	- Ajusta novo tempo para 30 min;
-		$02:s:090;	- Tempo máximo ligado para 90 min. Para não utilizar, colocar zero;
-	$03;			- Verifica detalhes do motor, pressão e sensor termico;
+		$02:s:090;	- Tempo mï¿½ximo ligado para 90 min. Para nï¿½o utilizar, colocar zero;
+	$03;			- Verifica detalhes do motor, pressï¿½o e sensor termico;
 		$03:s:72;	- Set pressure ref [m.c.a.];
 		$03:v:32;	- Set pressure for valve load turn on and fill reservoir;
 		$03:p:150;	- Set sensor max pressure ref to change the scale [psi];
 		$03:b:85;	- Set to 85% the pressure min bellow the current pressure to avoid pipe broken;
-	$04;			- Verifica detalhes do nível de água no poço e referência 10 bits;
-		$04:0;		- Interrompe o envio continuo das variáveis de pressão e nível;
-		$04:1;		- Envia continuamente valores de pressão e nível;
-		$04:0900;	- Adiciona nova referência para os sensores de nível. Valor de 0 a 1023;
-	$05;			- Mostra os horários que liga no modo $62;
+	$04;			- Verifica detalhes do nï¿½vel de ï¿½gua no poï¿½o e referï¿½ncia 10 bits;
+		$04:0;		- Interrompe o envio continuo das variï¿½veis de pressï¿½o e nï¿½vel;
+		$04:1;		- Envia continuamente valores de pressï¿½o e nï¿½vel;
+		$04:0900;	- Adiciona nova referï¿½ncia para os sensores de nï¿½vel. Valor de 0 a 1023;
+	$05;			- Mostra os horï¿½rios que liga no modo $62;
 	$06;			- Tempo ligado e tempo desligado;
 	$07:x;			- ADC reference change.
 		$07:0;		- AREF
@@ -1207,10 +1211,10 @@ $0X;				Verificar detalhes - Detalhes simples (tempo).
 	$08;			- Motivo do reboot.
 	$09;			- Reinicia o sistema.
 
-$1:h:HHMMSS;		- Ajustes do calendário;
-	$1:h:HHMMSS;	- Ajusta o horário do sistema;
+$1:h:HHMMSS;		- Ajustes do calendï¿½rio;
+	$1:h:HHMMSS;	- Ajusta o horï¿½rio do sistema;
 	$1:h:123040;	- E.g. ajusta a hora para 12:30:40
-	$1:d:DDMMAAAA;	- Ajusta a data do sistema no formato dia/mês/ano(4 dígitos);
+	$1:d:DDMMAAAA;	- Ajusta a data do sistema no formato dia/mï¿½s/ano(4 dï¿½gitos);
 	$1:d:04091986;	- E.g. Altera a data para 04/09/1986;
 	$1:c;			- Shows the LSI current prescaler value;
 	$1:c:40123;		- Set new prescaler value;
@@ -1229,17 +1233,17 @@ $3X;				- Acionamento do motor;
 	$30;			- desliga o motor;
 
 $5:n:X; ou $5:hX:HHMM;
-	$5:n:9;			- Configura para acionar 9 vezes. Necessário configurar 9 horários;
-	$5:n:9;			- Configura o sistema para acionar uma única vez às 21:30 horas;
-	$5:h1:2130;		- Configura o primeiro horário como 21:30 horas;
-	$5:h8:0437;		- Configura o oitavo horário como 04:37 horas;
+	$5:n:9;			- Configura para acionar 9 vezes. Necessï¿½rio configurar 9 horï¿½rios;
+	$5:n:9;			- Configura o sistema para acionar uma ï¿½nica vez ï¿½s 21:30 horas;
+	$5:h1:2130;		- Configura o primeiro horï¿½rio como 21:30 horas;
+	$5:h8:0437;		- Configura o oitavo horï¿½rio como 04:37 horas;
 
 $6X;				- Modos de funcionamento;
-	$60; 			- Sistema Desligado (nunca ligará);
-	$61;			- Liga somente à noite. Sensor superior;
-	$62;			- Liga nos determinados horários estipulados;
-	$63;			- Função para válvula do reservatório;
-	$64;			- Função para motobomba do reservatório;
+	$60; 			- Sistema Desligado (nunca ligarï¿½);
+	$61;			- Liga somente ï¿½ noite. Sensor superior;
+	$62;			- Liga nos determinados horï¿½rios estipulados;
+	$63;			- Funï¿½ï¿½o para vï¿½lvula do reservatï¿½rio;
+	$64;			- Funï¿½ï¿½o para motobomba do reservatï¿½rio;
 */
 	// Tx - Transmitter
 	if(enableDecode)
