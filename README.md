@@ -1,15 +1,17 @@
 # STM32F103
 
-This project consist a bunch of functions in C/C++ to control a series of sensors writed for STM32F1 running a cortex m3;
+This project consist a bunch of functions in C/C++ to control a series of sensors writed for STM32F1 running a cortex m3. It uses the common mapple mini board and St-link V2 SWD debbuger and flash.
 
 - Sensors
- + ADC pressure sensor;
- + HX711 for load cells on Cattle weight process;
+  + ADC pressure sensor;
+  + HX711 for load cells on Cattle weight process;
+  +
 
 - Modules
- + NOKIA 5110;
- + nRF24L01;
+  + NOKIA 5110;
+  + nRF24L01;
+  +
 
 - Drive
- + MOC3021 connected to one TRIAC BT136/7,8;
-
+  + MOC3021 connected to one TRIAC BT136/7,8;
+  +
