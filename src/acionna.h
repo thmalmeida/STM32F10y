@@ -32,7 +32,7 @@
 
 
 //#define readPin_Rth			(~PIND & 0b10000000)
-#define readPin_k1_PIN		bit_is_set(PIND, 2)
+#define readPin_k1		bit_is_set(PIND, 2)
 
 #define readPin_k1			bit_is_clear(PIND, 5)
 #define readPin_Rth			bit_is_clear(PIND, 6)
@@ -51,21 +51,24 @@
 #include "Hardware/EE.h"
 #include <ctime>
 
-#define pin_out_led 1
-#define pin_out_k1	4
-#define pin_out_k2	2
-#define pin_out_k3	3
-#define pin_in_Rth	5
-#define pin_in_k1	6
-#define pin_in_k3	7
-
-#define pin_analog_PRess 1
-#define pin_analog_LL 2
-#define pin_analog_ML 3
-#define pin_analog_HL 4
+#define pin_out_led 2
+#define pin_out_k1	6
+#define pin_out_k2	7
+#define pin_out_k3	8
+#define pin_in_Rth	9
+#define pin_in_k1	10
+#define pin_in_k2	11
+#define pin_in_k3	12
 
 
-#define startTypeK	1		// 1-Partida direta: monof�sico; 2-Partida direta: trif�sico; 3-Partida estrela/triangulo
+#define pin_analog_PRess_Dig 13
+#define pin_analog_PRess ADC_Channel_8		// Observe que o channel é o valor do pino + 4. ADC12_IN6 é o pino 10 em PA6. 10 - 4 = 6
+#define pin_analog_LL 7
+#define pin_analog_ML 8
+#define pin_analog_HL 9
+
+
+#define startTypeK	3		// 1-Partida direta: monofásico; 2-Partida direta: trifásico; 3-Partida estrela/triangulo
 
 enum states01 {
 	redTime,
@@ -89,6 +92,10 @@ public:
 
 	uint8_t stateMode = 0;					// currently state mode machine;
 	uint8_t motorStatus = 0;				// motor state: 1- on, 0- off;
+	uint8_t k1_status = 0;
+	uint8_t k2_status = 0;
+	uint8_t k3_status = 0;
+	uint8_t Rth_status = 0;
 	uint16_t motorTimerE = 0;				// time elapsed to turn load off;
 	uint8_t PRessureRef = 0;				// max threshold pressure;
 	uint8_t PRessureRef_Valve = 0;			// max threshold valve pressure to turn open;
@@ -123,7 +130,7 @@ public:
 	uint16_t timeOff_min = 0;
 	uint8_t  timeOff_sec = 0;
 
-	const uint8_t motorTimerStart1 = 35;	// delay on transition of k3 off and k2 on
+	const uint8_t motorTimerStart1 = 50;	// delay on transition of k3 off and k2 on
 	const uint16_t motorTimerStart2 = 200;	// delay on transition of k3 off and k2 on
 
 	const uint8_t HourOn  = 21;				// fixed season green tax period
@@ -153,10 +160,14 @@ public:
 	void driveMotor_ON(uint8_t startType);
 	void driveMotor_OFF();
 
-	uint8_t readPin_k1_PIN();
 	uint8_t readPin_k1();
-	uint8_t readPin_Rth();
-	uint8_t readPin_k3();
+
+	uint8_t read_Rth();
+	uint8_t read_k1();
+	uint8_t read_k2();
+	uint8_t read_k3();
+
+	void test();
 
 	void begin_acn();
 
@@ -167,24 +178,24 @@ public:
 	void get_levelSensors();
 	double get_Pressure();
 
-	void check_pressure();
 	void check_levelSensors();
 	void check_period();
-	void check_timeMatch();
-	void check_thermalSafe();
-	void check_gpio();
-	void check_TimerVar();
-	void check_pressureUnstable();
+	void check_pressure();
 	void check_pressureDown();
+	void check_pressureUnstable();
+	void check_thermalSafe();
+	void check_timeMatch();
+	void check_TimerVar();
 
+	void process_Mode();
+	void process_motorPeriodDecision();
 	void process_valveControl();
 	void process_waterPumpControl();
-	void process_motorPeriodDecision();
-	void process_Mode();
 
 	void summary_Print(uint8_t opt);
 	void RTC_update();
-	void RTC_update1();
+	void update_RTC();
+	void update_inputs();
 	void refreshVariables();
 	void refreshStoredData();
 	void handleMessage();
@@ -209,7 +220,6 @@ public:
 	uint8_t flag_01 = 0;
 	uint8_t flag_02 = 0;
 	uint8_t flag_03 = 0;
-private:
 
 	void k1_on();
 	void k1_off();
@@ -217,41 +227,217 @@ private:
 	void k2_off();
 	void k3_on();
 	void k3_off();
+private:
+
+
 };
 
+void ACIONNA::test()
+{
+//	sprintf(Serial.buffer," T1:%d k1:%d k2:%d k3:%d", read_Rth(), read_k1(), read_k2(), read_k3());
+//	Serial.println(Serial.buffer);
+
+	int a = adc_readChannel(pin_analog_PRess);
+	sprintf(Serial.buffer," adc:%d", a);
+	Serial.println(Serial.buffer);
+
+	_delay_ms(500);
+}
 void ACIONNA::begin_acn()
 {
 	gateConfig(pin_out_led, 1);		// Configure pin led as output;
 //	drive_led_on();
 	gateConfig(pin_out_k1, 1);
-//	gateConfig(pin_out_k2, 1);
-//	gateConfig(pin_out_k3, 1);
+	gateConfig(pin_out_k2, 1);
+	gateConfig(pin_out_k3, 1);
 //
-	gateConfig(pin_in_k1, 0);
-//	gateConfig(pin_in_k3, 0);
 	gateConfig(pin_in_Rth, 0);
-//
+	gateConfig(pin_in_k1, 0);
+	gateConfig(pin_in_k2, 0);
+	gateConfig(pin_in_k3, 0);
+
+	gateConfig(pin_analog_PRess_Dig, 0);
+
 	adc_begin();
 	eeprom.begin_eeprom();
 	refreshStoredData();
+}
+void ACIONNA::check_levelSensors()
+{
+	get_levelSensors();
+}
+void ACIONNA::check_period()
+{
+	// Season time verify
+	if(((tm.Hour == HourOn) && (tm.Minute == MinOn)) || (tm.Hour > HourOn) || (tm.Hour < HourOff) || ((tm.Hour == HourOff) && (tm.Minute < MinOff)))
+	{
+		periodo = greenTime;
 
-	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
+		if(flag_01)
+		{
+			flag_01 = 0;
+//			flag_timeMatch = 1;
+		}
+	}
+
+	if (((tm.Hour == HourOff) && (tm.Minute >= MinOff))	|| ((tm.Hour > HourOff) && (tm.Hour < HourOn))	|| ((tm.Hour == HourOn) && (tm.Minute < MinOn)))
+	{
+		periodo = redTime;
+
+//		flag_timeMatch = 0;
+		flag_01 = 1;
+	}
 }
-uint8_t ACIONNA::readPin_Rth()
+void ACIONNA::check_pressure()
 {
-	return gateRead(pin_in_Rth, 0);
+	PRess = get_Pressure();	// Get current pressure
+
+//	switch (stateMode)
+//	{
+//		case 1:
+//			break;
+//
+//		case 2:
+//			break;
+//
+//		case 3:	// Valve mode case. Do not turn off.
+//			break;
+//
+//		default:
+//			break;
+//	}
 }
-uint8_t ACIONNA::readPin_k1()
+void ACIONNA::check_pressureUnstable()	// this starts to check quick variation of pressure from high to low after 2 minutes on
 {
-	return 	gateRead(pin_out_k1, 0);
+	if(stateMode == 5 && timeOn_min > 2)
+	{
+		if(motorStatus)
+		{
+			if(PRess > PRessHold)
+			{
+				PRessHold = PRess;
+			}
+			else if(PRess < ((PRessurePer/100.0)*PRessHold))
+			{
+				flag_PressureUnstable = 1;
+			}
+		}
+	}
 }
-uint8_t ACIONNA::readPin_k1_PIN()
+void ACIONNA::check_pressureDown()	// this check if pressure is still low after 3 minutes on;
 {
-	return gateRead(pin_out_k1, 1);
+//	if(flag_conf_pressureUnstable && (timeOn_min > 3)
+	if(stateMode == 5 && (timeOn_min > 3))
+	{
+		if(motorStatus)
+		{
+			if(PRess < PRessureRef_Low)
+			{
+				// turn load off;
+			}
+		}
+	}
 }
-uint8_t ACIONNA::readPin_k3()
+void ACIONNA::check_timeMatch()
 {
-	return gateRead(pin_in_k3, 1);
+	uint8_t i, nTM_var=1;
+
+	// matching time verify
+	if(!motorStatus)
+	{
+		if(stateMode)
+		{
+			switch (stateMode)
+			{
+			case 1:
+				nTM_var = 1;
+				break;
+
+			case 2:
+				nTM_var = nTM;
+				break;
+
+			case 3:
+				nTM_var = nTM;
+				break;
+			}
+
+			for(i=0;i<nTM_var;i++)
+			{
+				if((tm.Hour == HourOnTM[i]) && (tm.Minute == MinOnTM[i]))
+				{
+					flag_timeMatch = 1;	// IF conditions are OK, SET (flag_timeMatch) variable;
+				}
+			}
+		}
+	}
+}
+void ACIONNA::check_thermalSafe()
+{
+	if(motorStatus)
+	{
+		if(read_Rth())
+		{
+			flag_Th = 1;
+		}
+		else
+		{
+			flag_Th = 0;
+		}
+	}
+}
+void ACIONNA::check_TimerVar()
+{
+	if(motorStatus)	// Load is ON;
+	{
+		if(timeOn_sec > 59)
+		{
+			timeOn_sec = 0;
+			timeOn_min++;
+		}
+		else
+		{
+			timeOn_sec++;
+		}
+	}
+	else			// Load is OFF;
+	{
+		if(timeOff_sec > 59)
+		{
+			timeOff_sec = 0;
+			timeOff_min++;
+		}
+		else
+		{
+			timeOff_sec++;
+		}
+	}
+
+	if(flag_waitPowerOn)
+	{
+		if(waitPowerOn_sec == 0)
+		{
+			if(waitPowerOn_min == 0)
+			{
+				flag_waitPowerOn = 0;
+			}
+			else
+			{
+				waitPowerOn_sec = 59;
+				waitPowerOn_min--;
+			}
+		}
+		else
+		{
+			waitPowerOn_sec--;
+		}
+	}
+}
+void ACIONNA::driveMotor_OFF()
+{
+	k1_off();
+	k2_off();
+	k3_off();
 }
 void ACIONNA::drive_led_on()
 {
@@ -264,6 +450,26 @@ void ACIONNA::drive_led_off()
 void ACIONNA::drive_led_toggle()
 {
 	gateToggle(pin_out_led);
+}
+uint8_t ACIONNA::read_Rth()
+{
+	return !gateRead(pin_in_Rth, 0);
+}
+uint8_t ACIONNA::read_k1()
+{
+	return 	!gateRead(pin_in_k1, 0);
+}
+uint8_t ACIONNA::read_k2()
+{
+	return !gateRead(pin_in_k2, 0);
+}
+uint8_t ACIONNA::read_k3()
+{
+	return !gateRead(pin_in_k3, 0);
+}
+uint8_t ACIONNA::readPin_k1()
+{
+	return gateRead(pin_out_k1, 1);
 }
 void ACIONNA::k1_on()
 {
@@ -283,17 +489,11 @@ void ACIONNA::k2_off()
 }
 void ACIONNA::k3_on()
 {
-
+	gateSet(pin_out_k3, 1);
 }
 void ACIONNA::k3_off()
 {
-
-}
-void ACIONNA::driveMotor_OFF()
-{
-	k1_off();
-	k2_off();
-	k3_off();
+	gateSet(pin_out_k3, 0);
 }
 void ACIONNA::blink_led(uint8_t qnt, uint8_t time)
 {
@@ -335,13 +535,13 @@ void ACIONNA::motor_stop(uint8_t reason)
 	drive_led_off();
 //	_delay_ms(1);
 
-	motorStatus = readPin_k1_PIN();
+	motorStatus = readPin_k1();
 //	sprintf(Serial.buffer,"offR:%d", reason);
 //	Serial.println(Serial.buffer);
 }
 void ACIONNA::motor_start()
 {
-	if(!flag_waitPowerOn)
+	if(!flag_waitPowerOn && !k2_status)
 	{
 		int i;
 		for(i=(nLog-1);i>0;i--)
@@ -365,22 +565,19 @@ void ACIONNA::motor_start()
 		PRessHold = PRess;
 
 		driveMotor_ON(startTypeK);
+		motorStatus = readPin_k1();
 		drive_led_on();
-
-//		_delay_ms(1);
-
-		motorStatus = readPin_k1_PIN();
 	}
 }
 void ACIONNA::driveMotor_ON(uint8_t startType)
 {
 	switch (startType)
 	{
-		case 1:	// Partida direta: monof�sico
+		case 1:	// Partida direta: monofásico
 			k1_on();
 			break;
 
-		case 2: // Partida direta: trif�sico
+		case 2: // Partida direta: trifásico
 			k1_on();
 			k2_on();
 			break;
@@ -388,16 +585,18 @@ void ACIONNA::driveMotor_ON(uint8_t startType)
 		case 3:	// Partida estrela/triangulo
 			k1_on();
 			k3_on();
+//			_delay_ms(2000);
 			//wdt_reset();
 			_delay_ms(((double) 100.0*motorTimerStart1));
 			//wdt_reset();
 
 			k3_off();
+//			_delay_ms(500);
 			uint32_t countK = 0;
-			while(readPin_k3())
+			while(read_k3())
 			{
 				countK++;
-				if(countK>=120000)
+				if(countK>=250000)
 				{
 					k1_off();
 					k2_off();
@@ -405,8 +604,7 @@ void ACIONNA::driveMotor_ON(uint8_t startType)
 					return;
 				}
 			}
-		//			Serial.print("FuCK: ");
-		//			Serial.println(count);
+//			Serial.println(count);
 			_delay_ms(motorTimerStart2);
 			k2_on();
 			break;
@@ -453,7 +651,7 @@ double ACIONNA::get_Pressure()
     Working pressure range: 0 to  1.2 MPa
     Maxi pressure: 2.4 MPa
     Working temperature range: 0 to 100 graus C
-    Accuracy: � 1.0%
+    Accuracy: +- 1.0%
     Response time: <= 2.0 ms
     Package include: 1 pc pressure sensor
     Wires : Red---Power (+5V)  Black---Power (0V) - blue ---Pulse singal output
@@ -506,201 +704,6 @@ double ACIONNA::get_Pressure()
 	return (PRessMax)*(Pd-102.4)/(921.6-102.4);
 //	(Pd - 103)/(922-103) = (Pa - 0)/(120 - 0);
 }
-void ACIONNA::check_pressure()
-{
-	PRess = get_Pressure();	// Get current pressure
-
-//	switch (stateMode)
-//	{
-//		case 1:
-//			break;
-//
-//		case 2:
-//			break;
-//
-//		case 3:	// Valve mode case. Do not turn off.
-//			break;
-//
-//		default:
-//			break;
-//	}
-}
-void ACIONNA::check_levelSensors()
-{
-	get_levelSensors();
-}
-void ACIONNA::check_period()
-{
-	// Season time verify
-	if(((tm.Hour == HourOn) && (tm.Minute == MinOn)) || (tm.Hour > HourOn) || (tm.Hour < HourOff) || ((tm.Hour == HourOff) && (tm.Minute < MinOff)))
-	{
-		periodo = greenTime;
-
-		if(flag_01)
-		{
-			flag_01 = 0;
-//			flag_timeMatch = 1;
-		}
-	}
-
-	if (((tm.Hour == HourOff) && (tm.Minute >= MinOff))	|| ((tm.Hour > HourOff) && (tm.Hour < HourOn))	|| ((tm.Hour == HourOn) && (tm.Minute < MinOn)))
-	{
-		periodo = redTime;
-
-//		flag_timeMatch = 0;
-		flag_01 = 1;
-	}
-}
-void ACIONNA::check_timeMatch()
-{
-	uint8_t i, nTM_var=1;
-
-	// matching time verify
-	if(!motorStatus)
-	{
-		if(stateMode)
-		{
-			switch (stateMode)
-			{
-			case 1:
-				nTM_var = 1;
-				break;
-
-			case 2:
-				nTM_var = nTM;
-				break;
-
-			case 3:
-				nTM_var = nTM;
-				break;
-			}
-
-			for(i=0;i<nTM_var;i++)
-			{
-				if((tm.Hour == HourOnTM[i]) && (tm.Minute == MinOnTM[i]))
-				{
-					flag_timeMatch = 1;	// IF conditions are OK, SET (flag_timeMatch) variable;
-				}
-			}
-		}
-	}
-}
-void ACIONNA::check_thermalSafe()
-{
-	if(motorStatus)
-	{
-		if(readPin_Rth())
-		{
-			uint16_t countThermal = 50000;
-			Serial.println("Th0");
-			while(readPin_Rth() && countThermal)
-			{
-				countThermal--;
-			}
-			Serial.println("Th1");
-			if(!countThermal)
-			{
-				flag_Th = 1;
-			}
-			else
-				flag_Th = 0;
-		}
-		else
-		{
-			flag_Th = 0;
-		}
-	}
-}
-void ACIONNA::check_gpio()
-{
-	if(startTypeK == 1)
-	{
-		motorStatus = readPin_k1_PIN();
-
-	}
-	else
-	{
-		motorStatus = readPin_k1();
-	}
-}
-void ACIONNA::check_TimerVar()
-{
-	if(motorStatus)	// Load is ON;
-	{
-		if(timeOn_sec > 59)
-		{
-			timeOn_sec = 0;
-			timeOn_min++;
-		}
-		else
-		{
-			timeOn_sec++;
-		}
-	}
-	else			// Load is OFF;
-	{
-		if(timeOff_sec > 59)
-		{
-			timeOff_sec = 0;
-			timeOff_min++;
-		}
-		else
-		{
-			timeOff_sec++;
-		}
-	}
-
-	if(flag_waitPowerOn)
-	{
-		if(waitPowerOn_sec == 0)
-		{
-			if(waitPowerOn_min == 0)
-			{
-				flag_waitPowerOn = 0;
-			}
-			else
-			{
-				waitPowerOn_sec = 59;
-				waitPowerOn_min--;
-			}
-		}
-		else
-		{
-			waitPowerOn_sec--;
-		}
-	}
-}
-void ACIONNA::check_pressureUnstable()	// this starts to check quick variation of pressure from high to low after 2 minutes on
-{
-	if(stateMode == 5 && timeOn_min > 2)
-	{
-		if(motorStatus)
-		{
-			if(PRess > PRessHold)
-			{
-				PRessHold = PRess;
-			}
-			else if(PRess < ((PRessurePer/100.0)*PRessHold))
-			{
-				flag_PressureUnstable = 1;
-			}
-		}
-	}
-}
-void ACIONNA::check_pressureDown()	// this check if pressure is still low after 3 minutes on;
-{
-//	if(flag_conf_pressureUnstable && (timeOn_min > 3)
-	if(stateMode == 5 && (timeOn_min > 3))
-	{
-		if(motorStatus)
-		{
-			if(PRess < PRessureRef_Low)
-			{
-				// turn load off;
-			}
-		}
-	}
-}
 void ACIONNA::process_valveControl()
 {
 	if(flag_timeMatch && (PRess >= PRessureRef_Valve))
@@ -725,21 +728,21 @@ void ACIONNA::process_waterPumpControl()
 	 * 0x07 - broke pressure
 	 * */
 
-	if(!levelSensorLL)
-	{
-		if(motorStatus)
-		{
-			motor_stop(0x02);
-		}
-	}
-
-	if(levelSensorHL && (stateMode == 4) && levelSensorLL)
-	{
-		if(!motorStatus)
-		{
-			motor_start();
-		}
-	}
+//	if(!levelSensorLL)
+//	{
+//		if(motorStatus)
+//		{
+//			motor_stop(0x02);
+//		}
+//	}
+//
+//	if(levelSensorHL && (stateMode == 4) && levelSensorLL)
+//	{
+//		if(!motorStatus)
+//		{
+//			motor_start();
+//		}
+//	}
 
 	if(flag_timeMatch && (stateMode != 0) && (stateMode != 4))
 	{
@@ -751,25 +754,25 @@ void ACIONNA::process_waterPumpControl()
 		}
 	}
 
-	if(PRessureRef)					// Has a valid number mean this function is activated
-	{
-		if(PRess >= PRessureRef)
-		{
-			if(motorStatus)
-			{
-				motor_stop(0x01);
-			}
-		}
-	}
-
-	if(stateMode == 5)
-	{
-		if(motorStatus && flag_PressureUnstable)
-		{
-			flag_PressureUnstable = 0;
-			motor_stop(0x07);
-		}
-	}
+//	if(PRessureRef)					// Has a valid number mean this function is activated
+//	{
+//		if(PRess >= PRessureRef)
+//		{
+//			if(motorStatus)
+//			{
+//				motor_stop(0x01);
+//			}
+//		}
+//	}
+//
+//	if(stateMode == 5)
+//	{
+//		if(motorStatus && flag_PressureUnstable)
+//		{
+//			flag_PressureUnstable = 0;
+//			motor_stop(0x07);
+//		}
+//	}
 
 	if(flag_Th)
 	{
@@ -852,7 +855,7 @@ void ACIONNA::summary_Print(uint8_t opt)
 			sprintf(Serial.buffer," UP:%.2d:%.2d:%.2d, d:%d m:%d", rtc.rtc0->tm_hour, rtc.rtc0->tm_min, rtc.rtc0->tm_sec, rtc.rtc0->tm_mday-1, rtc.rtc0->tm_mon);
 			Serial.println(Serial.buffer);
 
-			sprintf(Serial.buffer," P:%d k1:%d",periodo, motorStatus);
+			sprintf(Serial.buffer,"P:%d k1Pin:%d Rth:%d k1:%d k2:%d k3:%d",periodo, motorStatus, Rth_status, k1_status, k2_status, k3_status);
 			Serial.println(Serial.buffer);
 
 			switch (stateMode)
@@ -953,7 +956,7 @@ void ACIONNA::summary_Print(uint8_t opt)
 			break;
 
 		case 3:
-			sprintf(Serial.buffer,"Motor:%d Fth:%d Rth:%d Pr:%d ", motorStatus, flag_Th, readPin_Rth(), PRess);
+			sprintf(Serial.buffer,"Motor:%d Fth:%d Rth:%d Pr:%d ", motorStatus, flag_Th, read_Rth(), PRess);
 			Serial.print(Serial.buffer);
 			switch (stateMode)
 			{
@@ -981,6 +984,9 @@ void ACIONNA::summary_Print(uint8_t opt)
 
 			sprintf(Serial.buffer,"LL:%d ML:%d HL:%d",levelSensorLL_d, levelSensorML_d, levelSensorHL_d);
 			Serial.println(Serial.buffer);
+
+			sprintf(Serial.buffer,"Rth:%d k1:%d k2:%d k3:%d", Rth_status, k1_status, k2_status, k3_status);
+			Serial.println(Serial.buffer);
 			break;
 
 		case 5:
@@ -999,7 +1005,7 @@ void ACIONNA::summary_Print(uint8_t opt)
 			break;
 
 		case 7:
-			sprintf(Serial.buffer,"P:%d Fth:%d Rth:%d Ftm:%d k1:%d k3:%d", PRess, flag_Th, readPin_Rth(), flag_timeMatch, motorStatus, readPin_k3());
+			sprintf(Serial.buffer,"P:%d Fth:%d Rth:%d Ftm:%d k1:%d k2:%d k3:%d", PRess, flag_Th, read_Rth(), flag_timeMatch, motorStatus, read_k2(), read_k3());
 			Serial.println(Serial.buffer);
 
 			sprintf(Serial.buffer,"LL:%d ML:%d HL:%d  ",levelSensorLL, levelSensorML, levelSensorHL);
@@ -1027,7 +1033,15 @@ void ACIONNA::summary_Print(uint8_t opt)
 			break;
 	}
 }
-void ACIONNA::RTC_update1()
+void ACIONNA::update_inputs()
+{
+	motorStatus = readPin_k1();
+	k1_status = read_k1();
+	k2_status = read_k2();
+	k3_status = read_k3();
+	Rth_status = read_Rth();
+}
+void ACIONNA::update_RTC()
 {
 	rtc.getUptime();
 	rtc.getTime();
@@ -1099,16 +1113,17 @@ void ACIONNA::refreshVariables()
 		flag_1s = 0;
 //		gateToggle(1);
 
-		RTC_update1();
+		update_RTC();
+		update_inputs();
 //		RTC.read(tm);
 
-		check_gpio();			// Check drive status pin;
+		check_thermalSafe();	// thermal relay check;
 		check_period();			// Period verify;
 		check_timeMatch();		// time matches flag;
 		check_TimerVar();		// drive timers
 
 //		check_pressure();		// get and check pressure system;
-//		check_thermalSafe();	// thermal relay check;
+
 //		check_levelSensors();	// level sensors;
 
 //		check_pressureDown();
@@ -1188,20 +1203,22 @@ void ACIONNA::handleMessage()
 /*
 $0X;				Verificar detalhes - Detalhes simples (tempo).
 	$00;			- Detalhes simples (tempo).
-	$01;			- Verifica hist�rico de quando ligou e desligou;
+	$01;			- Verifica histórico de quando ligou e desligou;
 	$02;			- Mostra tempo que falta para ligar;
 		$02:c;		- Zera o tempo;
 		$02:c:30;	- Ajusta novo tempo para 30 min;
-		$02:s:090;	- Tempo m�ximo ligado para 90 min. Para n�o utilizar, colocar zero;
-	$03;			- Verifica detalhes do motor, press�o e sensor termico;
+		$02:s:090;	- Tempo máximo ligado para 90 min. Para não utilizar, colocar zero;
+	$03;			- Verifica detalhes do motor, pressão e sensor termico;
 		$03:s:72;	- Set pressure ref [m.c.a.];
 		$03:v:32;	- Set pressure for valve load turn on and fill reservoir;
 		$03:p:150;	- Set sensor max pressure ref to change the scale [psi];
 		$03:b:85;	- Set to 85% the pressure min bellow the current pressure to avoid pipe broken;
-	$04;			- Verifica detalhes do n�vel de �gua no po�o e refer�ncia 10 bits;
+		$03:m:3;	- Set 3 seconds while K1 and K3 are ON into delta tri start;
+		$03:t:500;	- Set 500 milliseconds to wait K3 go off before start K2;
+	$04;			- Verifica detalhes do nível de �gua no po�o e referência 10 bits;
 		$04:0;		- Interrompe o envio continuo das vari�veis de press�o e n�vel;
 		$04:1;		- Envia continuamente valores de press�o e n�vel;
-		$04:0900;	- Adiciona nova refer�ncia para os sensores de n�vel. Valor de 0 a 1023;
+		$04:s:0900;	- Adiciona nova referência para os sensores de nível. Valor de 0 a 1023;
 	$05;			- Mostra os hor�rios que liga no modo $62;
 	$06;			- Tempo ligado e tempo desligado;
 	$07:x;			- ADC reference change.
@@ -1240,10 +1257,10 @@ $5:n:X; ou $5:hX:HHMM;
 
 $6X;				- Modos de funcionamento;
 	$60; 			- Sistema Desligado (nunca ligar�);
-	$61;			- Liga somente � noite. Sensor superior;
+	$61;			- Liga somente à noite. Sensor superior;
 	$62;			- Liga nos determinados hor�rios estipulados;
-	$63;			- Fun��o para v�lvula do reservat�rio;
-	$64;			- Fun��o para motobomba do reservat�rio;
+	$63;			- Função para válvula do reservat�rio;
+	$64;			- Função para motobomba do reservat�rio;
 */
 	// Tx - Transmitter
 	if(enableDecode)
@@ -1265,7 +1282,7 @@ $6X;				- Modos de funcionamento;
 		aux[1] = sInstr[0];
 		aux[2] = '\0';
 		opcode = (uint8_t) atoi(aux);
-//		Serial1.println("Got!");
+//		Serial.println("Got!");
 		uint8_t statusCommand = 0;
 
 		switch (opcode)
@@ -1297,6 +1314,8 @@ $6X;				- Modos de funcionamento;
 							summary_Print(statusCommand);
 						}
 					}
+					break;
+
 					case 2:
 					{
 						if(sInstr[2]==':' && sInstr[3]=='c')
@@ -1621,6 +1640,7 @@ $6X;				- Modos de funcionamento;
 				if (motorCommand && (!motorStatus))
 				{
 					motor_start();
+					Serial.println("value");
 				}
 				else
 				{

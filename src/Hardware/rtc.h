@@ -27,8 +27,8 @@ public:
 	tm *rtc0 = new tm;
 	time_t uptime32 = 0;
 
-	uint32_t rtc_PRL;
-	uint8_t  rtc_clkSource;
+	uint32_t rtc_PRL=40500;
+	uint8_t  rtc_clkSource=0;
 
 	char _buffer[50];
 

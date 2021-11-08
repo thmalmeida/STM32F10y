@@ -1,0 +1,12 @@
+eclipse.preferences.version=1
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/IDF_PYTHON_ENV_PATH/delimiter=\:
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/IDF_PYTHON_ENV_PATH/operation=replace
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/IDF_PYTHON_ENV_PATH/value=
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/OPENOCD_SCRIPTS/delimiter=\:
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/OPENOCD_SCRIPTS/operation=replace
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/OPENOCD_SCRIPTS/value=
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/PATH/delimiter=\:
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/PATH/operation=replace
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/PATH/value=/home/thmalmeida/gcc-arm-none-eabi-10.3-2021.07/bin
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/append=true
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1989439597/appendContributed=true

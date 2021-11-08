@@ -51,9 +51,9 @@
 
 //#define pin_data_HX711	32
 //#define pin_sck_HX711	31
-#define pin_tare_HX711	27
-#define pin_led			1
-#define pin_beep		4
+#define pin_tare_HX711	32
+#define pin_led			2
+#define pin_beep		5
 
 class LOADCELL : ADC, GPIO {
 public:

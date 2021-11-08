@@ -15,12 +15,12 @@
 
 #define LCD_PORT 						GPIOA
 
-#define	LCD_PIN_LED						12	//GPIO_Pin_3
-#define LCD_PIN_SCE						15	//GPIO_Pin_0
-#define LCD_PIN_RESET					14	//GPIO_Pin_1
-#define LCD_PIN_COMMAND					13	//GPIO_Pin_2
-#define LCD_PIN_CLOCK					9	//GPIO_Pin_5
-#define LCD_PIN_DATA					11	//GPIO_Pin_7
+#define	LCD_PIN_LED						13	// PB0
+#define LCD_PIN_SCE						16	// PB11
+#define LCD_PIN_RESET					15	// PB10
+#define LCD_PIN_COMMAND					14	// PB1
+#define LCD_PIN_CLOCK					10	// PA5
+#define LCD_PIN_DATA					12	// PA7
 
 //#define SPIy                   SPI1
 //#define SPIy_CLK               RCC_APB2Periph_SPI1

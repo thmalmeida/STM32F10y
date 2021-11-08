@@ -33,7 +33,7 @@ void ADC::adc_begin()
 	//ADC1 channel16 configuration
 	//we select 41.5 cycles conversion for channel16
 	//and rank=1 which doesn't matter in single mode
-	ADC_RegularChannelConfig(ADC1, ADC_Channel_16, 1, ADC_SampleTime_41Cycles5);
+	ADC_RegularChannelConfig(ADC1, ADC_Channel_8, 1, ADC_SampleTime_41Cycles5);
 	//Enable ADC1
 	ADC_Cmd(ADC1, ENABLE);
 	//Enable ADC1 reset calibration register

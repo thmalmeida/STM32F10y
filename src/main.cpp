@@ -40,48 +40,93 @@ double Kc[5];
 int P[5];
 uint8_t mode = 0; 			// state machine begins from standard mode 0
 
+
+/*
+ * Interruptions sequence
+ */
+
+
+volatile int global_flag_1s;
+
+
 void test1()
 {
+	init();						// system clock stuffs init
+
 	GPIO pinos;
 
-	pinos.gateConfig(1, 1);
+	pinos.gateConfig(2, 1);
 	pinos.gateConfig(5, 1);
-	pinos.gateConfig(6, 1);
-	pinos.gateConfig(7, 1);
-	pinos.gateConfig(8, 1);
+//	pinos.gateConfig(5, 1);
+//	pinos.gateConfig(6, 1);
+//	pinos.gateConfig(7, 1);
+//	pinos.gateConfig(8, 1);
 
 
 	while(1)
 	{
-		pinos.gateToggle(1);
+		pinos.gateToggle(2);
 		pinos.gateToggle(5);
-		pinos.gateToggle(6);
-		pinos.gateToggle(7);
-		pinos.gateToggle(8);
-		_delay_ms(1000);
+//		pinos.gateToggle(5);
+//		pinos.gateToggle(6);
+//		pinos.gateToggle(7);
+//		pinos.gateToggle(8);
+		_delay_ms(100);
 	}
 }
 void test2()
 {
-	GPIO pinos;
-	pinos.gateConfig(1,1);
-	pinos.gateConfig(6,0);
-	pinos.gateConfig(7,0);
+	init();						// System clock stuffs init
 
-	int a = 0, b = 0;
+	GPIO pinos;
+
+	pinos.gateConfig(2, 1);
+	pinos.gateConfig(25, 1);
+//	pinos.gateConfig(5, 1);
+//	pinos.gateConfig(6, 1);
+//	pinos.gateConfig(7, 1);
+//	pinos.gateConfig(8, 1);
+
+
 	while(1)
 	{
-		a = pinos.gateRead(6, 0);
-		b = pinos.gateRead(7, 0);
-		if(a || b)
-			pinos.gateSet(1,1);
+		pinos.gateSet(2, 0);
+		pinos.gateSet(25, 0);
+		_delay_ms(250);
+		pinos.gateSet(2, 1);
+		pinos.gateSet(25, 1);
+		_delay_ms(250);
+	}
+}
+void test3()
+{
+	init();
+
+	GPIO pinos;
+	pinos.gateConfig(2,1);
+	pinos.gateConfig(5,1);
+	pinos.gateConfig(32,0);
+
+	int a = 0;
+	while(1)
+	{
+		a = pinos.gateRead(32, 0);
+
+		if(a)
+		{
+			pinos.gateSet(2,0);
+			pinos.gateSet(5,0);
+		}
 		else
-			pinos.gateSet(1,0);
+		{
+			pinos.gateSet(2,1);
+			pinos.gateSet(5,1);
+		}
 	}
 }
 
 // ----- Weight System -----
-void sensor_test()
+void weight_sensor_test()
 {	// Function to test sensor by sensor before to fly
 	int i;
 	int V[5];
@@ -108,9 +153,8 @@ void sensor_test()
 
 		_delay_ms(500);
 	}
-
 }
-void showResults()
+void weight_showResults()
 {
 	P[0] = P[1]+P[2]+P[3]+P[4];
 
@@ -493,7 +537,7 @@ void showResults()
 //		break;
 	}
 }
-void initialize()
+void weight_initialize()
 {
 	/*
 	 * Initial weight of cattle contention by foot
@@ -505,10 +549,10 @@ void initialize()
 	 * Pt: 1522.65 kg
 	 */
 
-	init();					// uC basic peripherals setup
-	acn.begin_acn();		// Class acionna statement
+	init();					// system uC basic peripherals setup
+//	acn.begin_acn();		// Class acionna statement??
+//	rtc.begin_rtc(rtc.rtc_clkSource, rtc.rtc_PRL);	// must be after eeprom init to recover rtc.rtc_PRL on flash
 	glcd.glcd_init(1);		// nokia 5110 graphic lcd init
-
 
 	A[0] = 1.0000;			// 1kg load bar (small load cell sensor)
 	A[1] = 2.9997;			// s1
@@ -527,10 +571,10 @@ void initialize()
 	weight3.offset = 11500; // s3
 	weight4.offset = 11500;	// s4
 
-	weight1.begin_loadcell( 7,  6, A[1], Kc[1]);
-	weight2.begin_loadcell(32, 31, A[2], Kc[2]);
-	weight3.begin_loadcell(19, 18, A[3], Kc[3]);
-	weight4.begin_loadcell(17, 16, A[4], Kc[4]);
+	weight1.begin_loadcell( 6,  7, A[1], Kc[1]);
+	weight2.begin_loadcell(37, 36, A[2], Kc[2]);
+	weight3.begin_loadcell(24, 23, A[3], Kc[3]);	// SDA: PB15, SCK: PB14;
+	weight4.begin_loadcell(22, 21, A[4], Kc[4]);
 
 	if(mode >= 7)
 	{
@@ -570,7 +614,11 @@ void initialize()
 	strcpy(glcd.buffer, "thmalmeida SYS");
 	glcd.glcd_put_string(0,2,glcd.buffer);
 
-	sensor_test();
+	_delay_ms(500);
+
+	// Test sensor before start read weight
+//	weight_sensor_test();
+
 	// Function to test sensor by sensor before to fly
 //	int i;
 //	for(i=1;i<=4;i++)
@@ -580,8 +628,6 @@ void initialize()
 //		P[1] = weight1.get_weight();
 //
 //	}
-
-
 
 	// This process find the initial weight. 50 iteraction suppose to be a good try
 //	for(i=0;i<50;i++)
@@ -604,7 +650,7 @@ void weight_process()
 	//	}
 
 //	test2();
-	initialize();
+	weight_initialize();
 
 	while(1)
 	{
@@ -674,11 +720,11 @@ void weight_process()
 			weight1.drive_beep(1, 10, 0);
 		}
 
-		if(acn.flag_1s == 1)			// in each 1 second interval, print the weight
+//		if(global_flag_1s == 1)			// in each 1 second interval, print the weight
 		{
-			acn.flag_1s = 0;
+//			global_flag_1s = 0;
 
-			showResults();				// Show results on screen
+			weight_showResults();				// Show results on screen
 
 			switch(mode)				// This is
 			{
@@ -773,7 +819,12 @@ void waterSystem_process()		//
 	acn.begin_acn();				// Class acionna statement
 	acn.blink_led(2, 150);
 	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
-	Serial.println("Acionna v2.1");
+	Serial.println("Acionna v2.2");
+
+//	while(1)
+//	{
+//		acn.test();
+//	}
 
 	// the main process comes here!
 	while(1)
@@ -785,18 +836,18 @@ void waterSystem_process()		//
 		acn.handleMessage();
 
 		acn.process_Mode();
-
-//		acn.drive_led_toggle();
 	}
 }
 
 int main(void)
 {
-	waterSystem_process();
+//	waterSystem_process();
 
 //	or
 
-//	weight_process();
+//	test3();
+
+	weight_process();
 
 	return 0;
 }
@@ -806,84 +857,6 @@ int main(void)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//int main(void)
-//{
-//	init();							// uC basic peripherals setup
-//
-//	acn.begin_acn();				// Class acionna statement
-////	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
-////	Serial.println("Acionna v2.0");
-//	acn.blink_led(2, 150);
-//	weight.begin_loadcell();
-//
-////	char c='0';
-////
-////	while(1)
-////	{
-////		sprintf(glcd.buffer, "a: %c", c++);
-////		Serial.println(glcd.buffer);
-////		_delay_ms(500);
-////	}
-//
-////	int c=10;
-////	while(1)
-////	{
-////		sprintf(glcd.buffer,"%4.1d g", c);
-////		glcd.glcd_big_str(0,0, glcd.buffer);
-////		c++;
-////		_delay_ms(500);
-////	}
-//
-//	weight.example1();
-//
-//	while(1)
-//	{
-////		acn.comm_Bluetooth();
-////
-////		acn.refreshVariables();
-////
-////		acn.handleMessage();
-////
-////		acn.process_Mode();
-//	}
-//}
-
-//const char * m()
-//{
-//    char * c = (char *)malloc(6 * sizeof(char));
-//    c = "hello";
-//    return (const char *)c;
-//}
-//
-//int main(int argc, char * argv[])
-//{
-//    const char * d = m();
-//    std::cout << d; // use PCSTR
-//}
-
-
-/*
- * Interruptions sequence
- */
 extern "C" {
 volatile int time_ms;
 volatile int time_us;
@@ -913,7 +886,7 @@ void RTC_IRQHandler(void)
 		RTC->CRL &= ~RTC_CRL_SECF;
 		rtc.uptime32++;
 		acn.flag_1s = 1;
-	}
+		global_flag_1s = 1;	}
 }
 void USART1_IRQHandler(void)
 {
@@ -1106,6 +1079,79 @@ void SPI1_IRQHandler(void)
 //#endif
 //}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//int main(void)
+//{
+//	init();							// uC basic peripherals setup
+//
+//	acn.begin_acn();				// Class acionna statement
+////	Serial.begin(9600);				// Initialize USART1 @ 9600 baud
+////	Serial.println("Acionna v2.0");
+//	acn.blink_led(2, 150);
+//	weight.begin_loadcell();
+//
+////	char c='0';
+////
+////	while(1)
+////	{
+////		sprintf(glcd.buffer, "a: %c", c++);
+////		Serial.println(glcd.buffer);
+////		_delay_ms(500);
+////	}
+//
+////	int c=10;
+////	while(1)
+////	{
+////		sprintf(glcd.buffer,"%4.1d g", c);
+////		glcd.glcd_big_str(0,0, glcd.buffer);
+////		c++;
+////		_delay_ms(500);
+////	}
+//
+//	weight.example1();
+//
+//	while(1)
+//	{
+////		acn.comm_Bluetooth();
+////
+////		acn.refreshVariables();
+////
+////		acn.handleMessage();
+////
+////		acn.process_Mode();
+//	}
+//}
+
+//const char * m()
+//{
+//    char * c = (char *)malloc(6 * sizeof(char));
+//    c = "hello";
+//    return (const char *)c;
+//}
+//
+//int main(int argc, char * argv[])
+//{
+//    const char * d = m();
+//    std::cout << d; // use PCSTR
+//}
 /*
  * Interruptions sequence END
  */
